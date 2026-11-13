@@ -224,6 +224,12 @@ describe("the slot tier (BYOK, owner 2026-09-22)", () => {
 });
 
 describe("resolveConversationSpec (the turn gate's chain)", () => {
+	it("a chat record's fast counts only when exactly true (hand-edited junk never sends priority)", () => {
+		const model = { provider: "chatgpt", id: "gpt-5.5" };
+		assert.equal("fast" in resolveConversationSpec({ model, fast: "yes" } as never, null)!, false);
+		assert.equal("fast" in resolveConversationSpec({ model, fast: 1 } as never, null)!, false);
+		assert.equal(resolveConversationSpec({ model, fast: true }, null)!.fast, true);
+	});
 	it("chat.model over the strong slot; null when both empty", () => {
 		assert.equal(resolveConversationSpec(undefined, null), null);
 		assert.deepEqual(
@@ -267,6 +273,20 @@ describe("resolveSideQuestionSpec", () => {
 		const record = { version: 1, models: { strong }, agent: { models: { sideQuestion: { thinkingLevel: "low" } } } } as UserSettings;
 		assert.deepEqual(resolveSideQuestionSpec(undefined, record), { provider: "openrouter", id: "strong-1", thinkingLevel: "low" });
 	});
+	it("carries Fast from the inherited conversation model, including thinking-only overrides", () => {
+		const model = { provider: "chatgpt", id: "gpt-6.1-sol" };
+		const record: UserSettings = { version: 1, models: { strong: { model, fast: true, thinkingLevel: "high" } }, agent: { models: { sideQuestion: { thinkingLevel: "low" } } } };
+		assert.deepEqual(resolveSideQuestionSpec(undefined, record), { ...model, thinkingLevel: "low", fast: true });
+		assert.deepEqual(resolveSideQuestionSpec({ model, fast: true }, record), { ...model, thinkingLevel: "low", fast: true });
+		assert.deepEqual(resolveSideQuestionSpec({ model }, record), { ...model, thinkingLevel: "low" }, "a standard chat model does not inherit Strong's Fast");
+	});
+	it("takes Fast only from the side-question override that supplies the model", () => {
+		const model = { provider: "chatgpt", id: "gpt-6.1-mini" };
+		const record: UserSettings = { version: 1, models: { strong: { model, fast: true, thinkingLevel: "high" } } };
+		assert.deepEqual(resolveSideQuestionSpec(undefined, { ...record, agent: { models: { sideQuestion: { model, fast: true } } } }), { ...model, thinkingLevel: "high", fast: true });
+		assert.deepEqual(resolveSideQuestionSpec(undefined, { ...record, agent: { models: { sideQuestion: { model } } } }), { ...model, thinkingLevel: "high" }, "an explicit standard override does not inherit Fast");
+		assert.deepEqual(resolveSideQuestionSpec({ model }, { ...record, agent: { models: { sideQuestion: { fast: true } } } }), { ...model, thinkingLevel: "high" }, "a model-less override cannot attach Fast to the inherited model");
+	});
 	it("is null with no model anywhere", () => { assert.equal(resolveSideQuestionSpec(undefined, null), null); });
 });
 
@@ -297,5 +317,37 @@ describe("the graph channel gates (the wave's seam honoring)", () => {
 		assert.deepEqual(eff.agent.graphTools, {});
 		const off = resolveSettings({ version: 1, agent: { graphTools: { enabled: false } } });
 		assert.deepEqual(off.agent.graphTools, { enabled: false });
+	});
+});
+describe("Fast follows the model it was saved with (OpenAI Fast mode, S6/S9)", () => {
+	const sol = { provider: "chatgpt", id: "gpt-6.1-sol" };
+	const mini = { provider: "chatgpt", id: "gpt-6.1-mini" };
+
+	it("resolveSlot carries a slot's fast", () => {
+		assert.deepEqual(resolveSlot({ model: sol, fast: true }), { provider: "chatgpt", id: "gpt-6.1-sol", thinkingLevel: undefined, fast: true });
+	});
+
+	it("conversation chain: the chat's model brings its own fast; no chat model borrows the strong slot's", () => {
+		const strong = resolveSlot({ model: sol, fast: true });
+		assert.equal(resolveConversationSpec({ model: mini }, strong)?.fast, undefined);
+		assert.equal(resolveConversationSpec({ model: mini, fast: true }, resolveSlot({ model: sol }))?.fast, true);
+		assert.equal(resolveConversationSpec({ thinkingLevel: "low" }, strong)?.fast, true);
+		assert.equal(resolveConversationSpec(undefined, strong)?.fast, true);
+	});
+
+	it("role chain: the override's model brings its own fast; a model-less override borrows the slot's", () => {
+		const slots = { cheap: { model: sol, fast: true as const } };
+		assert.equal(resolveModelSpec("researcher", { model: mini }, slots)?.fast, undefined);
+		assert.equal(resolveModelSpec("researcher", { model: mini, fast: true }, { cheap: { model: sol } })?.fast, true);
+		assert.equal(resolveModelSpec("researcher", { thinkingLevel: "low" }, slots)?.fast, true);
+		assert.equal(resolveRoleSpec("auditor", { version: 1, models: slots })?.fast, true);
+		assert.equal(resolveSettings({ version: 1, models: slots }).agent.models.extractor?.fast, true);
+	});
+
+	it("specs without fast carry no fast key (S9)", () => {
+		const slots = { strong: { model: sol }, cheap: { model: sol } };
+		assert.equal("fast" in resolveSlot(slots.strong)!, false);
+		assert.equal("fast" in resolveConversationSpec({ model: mini }, resolveSlot(slots.strong))!, false);
+		assert.equal("fast" in resolveModelSpec("researcher", undefined, slots)!, false);
 	});
 });

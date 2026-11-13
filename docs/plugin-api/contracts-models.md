@@ -26,6 +26,7 @@ export interface CatalogDefaults {
         id: string;
     };
     thinkingLevel?: ThinkingLevel;
+    fast?: true;
 }
 ```
 
@@ -35,6 +36,7 @@ export interface CatalogDefaults {
 - [model.provider](#catalogdefaults-modelprovider)
 - [model.id](#catalogdefaults-modelid)
 - [thinkingLevel](#catalogdefaults-thinkinglevel)
+- [fast](#catalogdefaults-fast)
 
 ### CatalogDefaults model
 
@@ -61,6 +63,14 @@ id: string;
 
 ```ts
 thinkingLevel?: ThinkingLevel;
+```
+
+### CatalogDefaults fast
+
+ChatGPT Fast pin (service_tier "priority"); follows the model.
+
+```ts
+fast?: true;
 ```
 
 ## CatalogProvider
@@ -130,6 +140,9 @@ export interface ModelCatalogEntry {
     } | null;
     contextWindow: number | null;
     maxTokens: number | null;
+    fast?: {
+        description: string;
+    };
 }
 ```
 
@@ -148,6 +161,8 @@ export interface ModelCatalogEntry {
 - [cost.cacheWrite](#modelcatalogentry-costcachewrite)
 - [contextWindow](#modelcatalogentry-contextwindow)
 - [maxTokens](#modelcatalogentry-maxtokens)
+- [fast](#modelcatalogentry-fast)
+- [fast.description](#modelcatalogentry-fastdescription)
 
 ### ModelCatalogEntry id
 
@@ -238,6 +253,23 @@ contextWindow: number | null;
 maxTokens: number | null;
 ```
 
+### ModelCatalogEntry fast
+
+ChatGPT-account models only: the Fast (priority) service tier the
+account catalog offers, with OpenAI's own description. Absent = no Fast.
+
+```ts
+fast?: {
+    description: string;
+};
+```
+
+### ModelCatalogEntry fast.description
+
+```ts
+description: string;
+```
+
 ## ModelCatalogResponse
 
 Public SDK type, exported as `ModelCatalogResponse`. Import with `import type`; the SDK has no runtime exports.
@@ -322,6 +354,7 @@ export type RolePins = Record<BackgroundModelRole, {
         id: string;
     };
     thinkingLevel?: ThinkingLevel;
+    fast?: true;
 } | null>;
 ```
 

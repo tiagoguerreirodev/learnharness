@@ -304,6 +304,7 @@ export interface ChatSettings {
         id: string;
     };
     thinkingLevel?: ThinkingLevel;
+    fast?: true;
 }
 ```
 
@@ -313,6 +314,7 @@ export interface ChatSettings {
 - [model.provider](#chatsettings-modelprovider)
 - [model.id](#chatsettings-modelid)
 - [thinkingLevel](#chatsettings-thinkinglevel)
+- [fast](#chatsettings-fast)
 
 ### ChatSettings model
 
@@ -344,6 +346,15 @@ pi thinking level — must be in the chosen model's supported list
 
 ```ts
 thinkingLevel?: ThinkingLevel;
+```
+
+### ChatSettings fast
+
+OpenAI Fast (service_tier "priority") for a ChatGPT-account model —
+rides `model` (enforced by the settings route); absent = standard.
+
+```ts
+fast?: true;
 ```
 
 ## ChatSummary

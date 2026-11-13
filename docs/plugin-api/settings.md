@@ -63,6 +63,7 @@ export interface ModelSlot {
         id: string;
     };
     thinkingLevel?: ThinkingLevel;
+    fast?: true;
 }
 ```
 
@@ -73,6 +74,7 @@ export interface ModelSlot {
 - [model.provider](#modelslot-modelprovider)
 - [model.id](#modelslot-modelid)
 - [thinkingLevel](#modelslot-thinkinglevel)
+- [fast](#modelslot-fast)
 
 ### ModelSlot cacheRetention
 
@@ -111,6 +113,14 @@ Optional thinking level used with this slot's configured model.
 
 ```ts
 thinkingLevel?: ThinkingLevel;
+```
+
+### ModelSlot fast
+
+OpenAI Fast for the slot's own model (kept only with `model`).
+
+```ts
+fast?: true;
 ```
 
 ## ModelSlotName
