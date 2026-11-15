@@ -72,7 +72,7 @@ function applyChrome(win) {
  *  the window points at the running `next dev` server (full HMR). */
 function serverEntry() {
 	// extraResources ships the whole .next payload under server/standalone/
-	// (copied from .next with an explicit filter — see electron-builder.yml).
+	// (copied from .next with an explicit filter — see electron-builder.base.yml).
 	return path.join(process.resourcesPath, "server", "standalone", "server.js");
 }
 
@@ -445,8 +445,8 @@ const ZOOM_LADDER = [0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
 /* ── Auto-update (Wave C, owner 2026-10-10: silent download + restart ─────
  * banner; checks at startup + every 24h) ─────────────────────────────────
  *
- * Feed: GitHub Releases (electron-builder.yml publish → app-update.yml,
- * baked + signed into the bundle). macOS needs the app signed (it is —
+ * Feed: GitHub Releases (electron-builder.cjs resolves the build repository
+ * over electron-builder.base.yml → baked app-update.yml). macOS needs the app signed (it is —
  * Developer ID) and updates ride the zip target (Squirrel.Mac); blockmaps
  * give differential downloads for free. Windows uses NSIS; Linux uses
  * AppImage or DebUpdater (6.8.9 supports deb; installation can request

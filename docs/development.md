@@ -30,7 +30,7 @@ npm run build          # stage core plugins, then Next production/standalone bui
 npm start              # serve the production build with Next
 ```
 
-`npm run desktop:dist` is the local **signed macOS** packaging path, not a portable unsigned shortcut. Prerequisites and Windows/Linux instructions are in [Desktop builds and releases](desktop-release.md).
+`npm run desktop:dist` is the local **signed macOS** packaging path, not a portable unsigned shortcut. Prerequisites, the Windows-only release workflow, and local Windows/Linux instructions are in [Desktop builds and releases](desktop-release.md). Fork builds select their release repository at build time; export any `LH_RELEASE_REPOSITORY=owner/repo` override for **both** the production build and packaging, and rebuild frozen renderer output when identity changes. See the [source-archive example](desktop-release.md#windows-source-archive-or-explicit-override-example).
 
 ### Other devices on your network
 
@@ -55,6 +55,9 @@ Nonsecret settings are deltas in `<data root>/settings.json`; absent values reso
 | `DEEPGRAM_API_KEY` | Optional dictation token minting. |
 | `CHROME_PATH` | Chrome/Chromium executable fallback for demo verification; Electron's browser helper is primary. No extra Chromium is downloaded. |
 | `LH_ALLOWED_HOSTS` | Browser-only mode: extra host names the API accepts besides `localhost` and IP addresses. Comma-separated, case-insensitive, port ignored, no wildcards. |
+| `LH_RELEASE_REPOSITORY` | Build-time GitHub `owner/repo` override, before `GITHUB_REPOSITORY` and application Git origin. Export throughout build/packaging; not a runtime setting. Empty/invalid supplied identities fail. |
+
+`LH_RELEASE_REPOSITORY_URL` is canonical public **build output**, not an override. An unidentified web-only build omits Release notes; desktop packaging fails even with publishing disabled. Homepage/provider attribution is not a repository fallback. See [repository selection and worktree/archive support](desktop-release.md#build-time-release-repository), including the distinct absent/empty Actions-variable policy.
 
 Ordinary Next development can read `.env.local`. Real environment keys take precedence over saved keys. Saved auth is restrictive-permission plaintext, not an encrypted vault. Packaged Electron sets separate data/auth locations under `userData`; it does not use the repo development profile.
 
