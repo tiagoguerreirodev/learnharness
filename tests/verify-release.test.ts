@@ -7,6 +7,7 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import { createRequire } from "node:module";
 import * as os from "node:os";
@@ -25,6 +26,7 @@ const repoRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const script = path.join(repoRoot, "scripts", "verify-release.ts");
 const VERSION = "0.2.0";
 const TAG = `v${VERSION}`;
+const repository = { owner: "fixture", repo: "release" };
 
 /** A base64-looking sha512 (the gate checks shape, not the actual digest). */
 const sha512 = (seed: string) => Buffer.from(seed.padEnd(64, "0")).toString("base64");
@@ -146,7 +148,7 @@ describe("release gate — packaging-config drift guard", () => {
 	const realPkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
 
 	it("accepts the repository's real configuration", () => {
-		const verdict = verifyConfigAssumptions(realConfig, realPkg);
+		const verdict = verifyConfigAssumptions(realConfig, realPkg, repository);
 		assert.ok(verdict.ok, JSON.stringify(verdict, null, 2));
 	});
 
@@ -154,7 +156,18 @@ describe("release gate — packaging-config drift guard", () => {
 		const config = structuredClone(realConfig) as Record<string, unknown>;
 		delete config.mac;
 		delete config.linux;
-		assert.ok(verifyConfigAssumptions(config, realPkg).ok);
+		assert.ok(verifyConfigAssumptions(config, realPkg, repository).ok);
+	});
+
+	it("requires exactly one selected GitHub draft destination with no platform overrides", () => {
+		for (const publish of [[], [...realConfig.publish, { provider: "generic", url: "https://example.com" }],
+			[{ ...realConfig.publish[0], owner: "upstream" }], [{ ...realConfig.publish[0], repo: "wrong" }]]) {
+			assert.equal(verifyConfigAssumptions({ ...realConfig, publish }, realPkg, repository).ok, false, JSON.stringify(publish));
+		}
+		assert.equal(verifyConfigAssumptions({ ...realConfig, win: { ...realConfig.win, publish: realConfig.publish } }, realPkg, repository).ok, false);
+		for (const extra of [{ host: "other.example" }, { private: true }, { token: "secret-never-log" }]) {
+			assert.equal(verifyConfigAssumptions({ ...realConfig, publish: [{ ...realConfig.publish[0], ...extra }] }, realPkg, repository).ok, false);
+		}
 	});
 
 	const drifts: Array<[string, (config: Record<string, unknown>) => void]> = [
@@ -170,7 +183,7 @@ describe("release gate — packaging-config drift guard", () => {
 			const config = structuredClone(realConfig) as Record<string, unknown>;
 			mutate(config);
 			const pkg = label === "package name" ? { ...realPkg, name: "other" } : realPkg;
-			const verdict = verifyConfigAssumptions(config, pkg);
+			const verdict = verifyConfigAssumptions(config, pkg, repository);
 			assert.ok(!verdict.ok);
 			assert.match(verdict.errors.join("\n"), /expected names no longer hold|would not land in the draft|no longer "learnharness"|productName is /);
 		});
@@ -347,7 +360,7 @@ describe("release gate — workflow wiring", () => {
 
 	it("can see drafts after Windows packaging, only on real tag pushes", () => {
 		assert.ok(verify);
-		assert.equal(verify.needs, "package");
+		assert.deepEqual(verify.needs, ["quality", "package"]);
 		assert.equal(verify.if, "github.event_name == 'push'");
 		// GitHub's release-list API hides drafts from read-only tokens.
 		assert.deepEqual(verify.permissions, { contents: "write" });
@@ -393,6 +406,54 @@ describe("release gate — workflow wiring", () => {
 		assert.match(download.run, /for name in latest\.yml; do/);
 		assert.doesNotMatch(download.run, /latest-(mac|linux)\.yml/);
 		assert.match(download.run, /releases\/assets\/\$id/);
+	});
+});
+
+describe("release gate — actual Windows package boundary", () => {
+	it("checks baked updater identity and nonempty exe/blockmap/feed against the selected repository, without a tag", () => {
+		const root = fs.mkdtempSync(path.join(os.tmpdir(), "lh-package-gate-"));
+		const version = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).version;
+		const exe = `LearnHarness-${version}-x64-setup.exe`;
+		const resources = path.join(root, "win-unpacked", "resources");
+		fs.mkdirSync(resources, { recursive: true });
+		const bytes = Buffer.from("MZ controlled installer bytes");
+		const digest = createHash("sha512").update(bytes).digest("base64");
+		const updater = "provider: github\nowner: fixture\nrepo: release\nreleaseType: draft\nupdaterCacheDirName: learnharness-updater\n";
+		const feed = `version: ${version}\nfiles:\n  - url: ${exe}\n    sha512: ${digest}\n    size: ${bytes.length}\npath: ${exe}\nsha512: ${digest}\n`;
+		const reset = () => {
+			fs.writeFileSync(path.join(resources, "app-update.yml"), updater);
+			fs.writeFileSync(path.join(root, exe), bytes);
+			fs.writeFileSync(path.join(root, `${exe}.blockmap`), "blockmap fixture");
+			fs.writeFileSync(path.join(root, "latest.yml"), feed);
+		};
+		const run = () => spawnSync(process.execPath, ["--import", import.meta.resolve("tsx"), script, "package", root], {
+			cwd: repoRoot, encoding: "utf8", env: { ...process.env, LH_RELEASE_REPOSITORY: "fixture/release" },
+		});
+		try {
+			reset();
+			assert.equal(run().status, 0, run().stderr);
+			const mutations: Array<[() => void, RegExp]> = [
+				[() => fs.writeFileSync(path.join(resources, "app-update.yml"), updater.replace("owner: fixture", "owner: upstream")), /baked updater/],
+				[() => fs.writeFileSync(path.join(resources, "app-update.yml"), updater + "token: secret-never-log\n"), /baked updater/],
+				[() => fs.rmSync(path.join(resources, "app-update.yml")), /app-update.yml/],
+				[() => fs.rmSync(path.join(root, exe)), /missing|cannot read/],
+				[() => fs.writeFileSync(path.join(root, `${exe}.blockmap`), ""), /zero-size/],
+				[() => fs.rmSync(path.join(root, "latest.yml")), /latest.yml/],
+				[() => fs.writeFileSync(path.join(root, "latest.yml"), feed.replace(`version: ${version}`, "version: 99.0.0")), /version/],
+				[() => fs.writeFileSync(path.join(root, "latest.yml"), feed.replace(`url: ${exe}`, "url: https://evil.example/installer.exe")), /bare asset name/],
+				[() => fs.writeFileSync(path.join(root, exe), Buffer.from("XX controlled installer bytes")), /sha512.*installer/],
+			];
+			for (const [mutate, message] of mutations) {
+				reset();
+				mutate();
+				const result = run();
+				assert.equal(result.status, 1, result.stdout);
+				assert.match(result.stderr, message);
+				assert.doesNotMatch(result.stderr, /secret-never-log/);
+			}
+		} finally {
+			fs.rmSync(root, { recursive: true, force: true });
+		}
 	});
 });
 
@@ -493,6 +554,26 @@ describe("release gate — CLI (offline, repo config)", () => {
 			const result = run(["verify", path.join(root, "releases.json"), path.join(root, "metadata"), "--tag", `v${futureVersion}`], root);
 			assert.equal(result.status, 0, String(result.stderr));
 			assert.ok(result.stdout.includes(`OK: draft for v${futureVersion} is complete`));
+		} finally {
+			fs.rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it("checks Builder's actual default configuration instead of bypassing competing package.json.build", () => {
+		const { root } = workspace();
+		try {
+			const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
+			const config = require("../electron-builder.cjs")({ projectDir: repoRoot, env: { LH_RELEASE_REPOSITORY: "fixture/release" } });
+			pkg.build = { ...config, publish: [...config.publish, { provider: "generic", url: "https://other.example" }] };
+			fs.writeFileSync(path.join(root, "package.json"), JSON.stringify(pkg));
+			fs.mkdirSync(path.join(root, "scripts"));
+			for (const name of ["electron-builder.cjs", "electron-builder.base.yml", "scripts/release-repository.cjs"]) {
+				fs.copyFileSync(path.join(repoRoot, name), path.join(root, name));
+			}
+			fs.symlinkSync(path.join(repoRoot, "node_modules"), path.join(root, "node_modules"), process.platform === "win32" ? "junction" : "dir");
+			const result = run(["verify", path.join(root, "releases.json"), path.join(root, "metadata"), "--tag", TAG], root);
+			assert.equal(result.status, 1, result.stdout);
+			assert.match(result.stderr, /exactly one github provider/);
 		} finally {
 			fs.rmSync(root, { recursive: true, force: true });
 		}
