@@ -133,8 +133,7 @@ describe("backend-only preload wiring and packaging", () => {
 	}
 
 	it("electron-builder copies the guard outside ASAR only on macOS, retaining shared resources", async () => {
-		const yaml = require("js-yaml");
-		const config = yaml.load(readFileSync(path.join(root, "electron-builder.yml"), "utf8"));
+		const config = require("../electron-builder.cjs")({ projectDir: root, env: { LH_RELEASE_REPOSITORY: "fixture/release" } });
 		const { getFileMatchers, copyFiles } = require("app-builder-lib/out/fileMatcher.js");
 		const destination = mkdtempSync(path.join(tmpdir(), "lh-title-resource-"));
 		try {
