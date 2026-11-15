@@ -481,6 +481,14 @@ describe("release gate — CLI (offline, repo config)", () => {
 		return { root, release };
 	}
 
+	function provisionBuilderFixture(root: string) {
+		fs.mkdirSync(path.join(root, "scripts"));
+		for (const name of ["electron-builder.cjs", "electron-builder.base.yml", "scripts/release-repository.cjs"]) {
+			fs.copyFileSync(path.join(repoRoot, name), path.join(root, name));
+		}
+		fs.symlinkSync(path.join(repoRoot, "node_modules"), path.join(root, "node_modules"), process.platform === "win32" ? "junction" : "dir");
+	}
+
 	it("select emits machine JSON for the workflow's download step", () => {
 		const { root, release } = workspace();
 		try {
@@ -546,11 +554,7 @@ describe("release gate — CLI (offline, repo config)", () => {
 		try {
 			const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
 			fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ ...pkg, version: futureVersion }));
-			fs.mkdirSync(path.join(root, "scripts"));
-			for (const name of ["electron-builder.cjs", "electron-builder.base.yml", "scripts/release-repository.cjs"]) {
-				fs.copyFileSync(path.join(repoRoot, name), path.join(root, name));
-			}
-			fs.symlinkSync(path.join(repoRoot, "node_modules"), path.join(root, "node_modules"), process.platform === "win32" ? "junction" : "dir");
+			provisionBuilderFixture(root);
 			const result = run(["verify", path.join(root, "releases.json"), path.join(root, "metadata"), "--tag", `v${futureVersion}`], root);
 			assert.equal(result.status, 0, String(result.stderr));
 			assert.ok(result.stdout.includes(`OK: draft for v${futureVersion} is complete`));
@@ -566,11 +570,7 @@ describe("release gate — CLI (offline, repo config)", () => {
 			const config = require("../electron-builder.cjs")({ projectDir: repoRoot, env: { LH_RELEASE_REPOSITORY: "fixture/release" } });
 			pkg.build = { ...config, publish: [...config.publish, { provider: "generic", url: "https://other.example" }] };
 			fs.writeFileSync(path.join(root, "package.json"), JSON.stringify(pkg));
-			fs.mkdirSync(path.join(root, "scripts"));
-			for (const name of ["electron-builder.cjs", "electron-builder.base.yml", "scripts/release-repository.cjs"]) {
-				fs.copyFileSync(path.join(repoRoot, name), path.join(root, name));
-			}
-			fs.symlinkSync(path.join(repoRoot, "node_modules"), path.join(root, "node_modules"), process.platform === "win32" ? "junction" : "dir");
+			provisionBuilderFixture(root);
 			const result = run(["verify", path.join(root, "releases.json"), path.join(root, "metadata"), "--tag", TAG], root);
 			assert.equal(result.status, 1, result.stdout);
 			assert.match(result.stderr, /exactly one github provider/);
