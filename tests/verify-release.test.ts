@@ -142,8 +142,7 @@ describe("release gate — draft selection (fail-closed, existing tag matching)"
 });
 
 describe("release gate — packaging-config drift guard", () => {
-	const yaml = require("js-yaml") as { load(source: string): unknown };
-	const realConfig = yaml.load(fs.readFileSync(path.join(repoRoot, "electron-builder.yml"), "utf8"));
+	const realConfig = require("../electron-builder.cjs")({ projectDir: repoRoot, env: { LH_RELEASE_REPOSITORY: "fixture/release" } });
 	const realPkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
 
 	it("accepts the repository's real configuration", () => {
@@ -402,10 +401,11 @@ describe("release gate — CLI (offline, repo config)", () => {
 	// intentionally stay at 0.2.0. A release version bump must not break tests.
 	const VERSION = (JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")) as { version: string }).version;
 	const TAG = `v${VERSION}`;
-	const tsxImport = fileURLToPath(import.meta.resolve("tsx"));
+	const tsxImport = import.meta.resolve("tsx");
 	function run(args: string[], cwd = repoRoot) {
 		return spawnSync(process.execPath, ["--import", tsxImport, script, ...args], {
 			cwd, encoding: "utf8", timeout: 60_000,
+			env: { ...process.env, LH_RELEASE_REPOSITORY: "fixture/release" },
 		});
 	}
 
@@ -485,7 +485,11 @@ describe("release gate — CLI (offline, repo config)", () => {
 		try {
 			const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
 			fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ ...pkg, version: futureVersion }));
-			fs.copyFileSync(path.join(repoRoot, "electron-builder.yml"), path.join(root, "electron-builder.yml"));
+			fs.mkdirSync(path.join(root, "scripts"));
+			for (const name of ["electron-builder.cjs", "electron-builder.base.yml", "scripts/release-repository.cjs"]) {
+				fs.copyFileSync(path.join(repoRoot, name), path.join(root, name));
+			}
+			fs.symlinkSync(path.join(repoRoot, "node_modules"), path.join(root, "node_modules"), process.platform === "win32" ? "junction" : "dir");
 			const result = run(["verify", path.join(root, "releases.json"), path.join(root, "metadata"), "--tag", `v${futureVersion}`], root);
 			assert.equal(result.status, 0, String(result.stderr));
 			assert.ok(result.stdout.includes(`OK: draft for v${futureVersion} is complete`));

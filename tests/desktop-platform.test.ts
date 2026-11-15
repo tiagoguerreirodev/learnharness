@@ -262,8 +262,7 @@ describe("update preload bridge", () => {
 });
 
 describe("desktop packaging policy", () => {
-	const yaml = require("js-yaml") as { load(source: string): Record<string, any> };
-	const config = yaml.load(readFileSync(new URL("../electron-builder.yml", import.meta.url), "utf8"));
+	const config = require("../electron-builder.cjs")({ env: { LH_RELEASE_REPOSITORY: "fixture/release" } });
 
 	it("configuration is accepted by the INSTALLED electron-builder schema", async () => {
 		const { validateConfiguration } = require("app-builder-lib/out/util/config/config.js");
