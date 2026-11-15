@@ -1,14 +1,15 @@
 /**
  * verify-release.ts — the final desktop-release gate (2026-10-13).
  *
- * Runs in the release workflow's LAST job, after Windows packaging uploads
+ * Checks local Windows output in both release modes and runs in the release
+ * workflow's LAST job after tag-triggered Windows packaging uploads
  * to the tag's single draft GitHub Release, and fails the workflow unless
  * that draft holds exactly what Windows end users and electron-updater
  * need. The workflow never publishes; this script only reads (release list
  * and update feed downloaded by the workflow's GET-only gh steps).
  *
  * Every expected file name below was verified against the INSTALLED
- * builder (app-builder-lib 26.15.3) — these are the artifacts it actually
+ * builder (app-builder-lib 26.16.1) — these are the artifacts it actually
  * emits for this repo's effective Builder configuration, not pattern guesses:
  *
  *   win (nsis x64; artifactName "${productName}-${version}-${arch}-setup.${ext}"):
@@ -27,7 +28,10 @@
  * matches both spellings, so a later run could create a SECOND draft under
  * the v-tag and split the assets across two releases.
  *
- * CLI (cwd = the checked-out tag revision):
+ * CLI (cwd = the checked-out revision; package needs no tag or release API):
+ *   tsx scripts/verify-release.ts package <dist-dir>
+ *     → checks the actual baked public GitHub updater identity, nonempty
+ *       installer/blockmap/feed, strict feed fields and the installer digest.
  *   tsx scripts/verify-release.ts select <releases.json> --tag <tag>
  *     → one JSON object on stdout: {releaseId, matchedTagName, warnings,
  *       assets:[{id,name,size,state}]}; diagnostics on stderr. Used by the
@@ -53,8 +57,11 @@
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
+import { resolveReleaseRepository } from "./release-repository.cjs";
 
 const require = createRequire(import.meta.url);
 const yaml = require("js-yaml") as { load(source: string): unknown };
@@ -222,7 +229,9 @@ export function selectDraft(releases: ReleaseRecord[], tag: string, version: str
 /** Names below were derived from these exact config shapes; drift means the
  *  expectations in this file must be re-derived against the new builder
  *  output. Failing here is deliberate: a silently stale gate is worse. */
-export function verifyConfigAssumptions(config: unknown, pkg: unknown): { ok: true } | { ok: false; errors: Issues } {
+type ReleaseRepository = { owner: string; repo: string };
+
+export function verifyConfigAssumptions(config: unknown, pkg: unknown, repository: ReleaseRepository): { ok: true } | { ok: false; errors: Issues } {
 	const errors: Issues = [];
 	const bad = (message: string) => errors.push(message);
 	if (!isPlainObject(pkg) || typeof pkg.version !== "string") bad("package.json has no string version");
@@ -243,9 +252,20 @@ export function verifyConfigAssumptions(config: unknown, pkg: unknown): { ok: tr
 			bad(`win.target changed (${JSON.stringify(config.win.target)}) — expected names no longer hold`);
 		}
 	}
-	const publish = Array.isArray(config.publish) ? config.publish[0] : undefined;
+	const publish = Array.isArray(config.publish) && config.publish.length === 1 ? config.publish[0] : undefined;
 	if (!isPlainObject(publish) || publish.provider !== "github" || publish.releaseType !== "draft") {
-		bad(`publish[0] must be the github provider with releaseType "draft" (${JSON.stringify(config.publish)}) — uploads would not land in the draft`);
+		bad('publish must contain exactly one github provider with releaseType "draft" — uploads would not land in the draft');
+	} else if (publish.owner !== repository.owner || publish.repo !== repository.repo ||
+		Object.keys(publish).some((key) => !["provider", "owner", "repo", "releaseType"].includes(key))) {
+		bad("publish destination must contain only the selected public GitHub release repository");
+	}
+	const checkNestedPublish = (value: unknown): void => {
+		if (typeof value !== "object" || value === null) return;
+		if (Object.hasOwn(value, "publish")) bad("nested publish overrides must not replace the selected release repository");
+		for (const child of Object.values(value)) checkNestedPublish(child);
+	};
+	for (const [key, value] of Object.entries(config)) {
+		if (key !== "publish") checkNestedPublish(value);
 	}
 	if (errors.length > 0) {
 		errors.push("packaging config drifted from the verified shapes — re-derive the expected assets in scripts/verify-release.ts");
@@ -395,12 +415,71 @@ export function verifyMetadataFiles(
 }
 
 // ---------------------------------------------------------------------------
+// Local Windows package gate — actual emitted files, never release API calls.
+// ---------------------------------------------------------------------------
+
+function fileSha512(file: string): string {
+	const hash = createHash("sha512");
+	const fd = fs.openSync(file, "r");
+	try {
+		const buffer = Buffer.alloc(1024 * 1024);
+		let size: number;
+		while ((size = fs.readSync(fd, buffer)) > 0) hash.update(buffer.subarray(0, size));
+		return hash.digest("base64");
+	} finally {
+		fs.closeSync(fd);
+	}
+}
+
+function verifyWindowsPackage(distDir: string, expected: ExpectedAssets, repository: ReleaseRepository): Issues {
+	const errors: Issues = [];
+	try {
+		const baked = yaml.load(fs.readFileSync(path.join(distDir, "win-unpacked", "resources", "app-update.yml"), "utf8"));
+		const allowed = ["provider", "owner", "repo", "releaseType", "updaterCacheDirName"];
+		if (!isPlainObject(baked) || baked.provider !== "github" || baked.owner !== repository.owner || baked.repo !== repository.repo ||
+			baked.releaseType !== "draft" || Object.keys(baked).some((key) => !allowed.includes(key))) {
+			errors.push("baked updater must contain only the selected public GitHub draft destination (app-update.yml)");
+		}
+	} catch {
+		errors.push("cannot read or parse baked updater app-update.yml");
+	}
+	const assets: ReleaseAsset[] = [];
+	for (const [id, name] of expected.files.entries()) {
+		try {
+			const stat = fs.statSync(path.join(distDir, name));
+			if (!stat.isFile()) throw new Error("not a file");
+			assets.push({ id, name, size: stat.size, state: "uploaded" });
+		} catch {
+			errors.push(`${name}: missing or not a regular file in the Windows package output`);
+		}
+	}
+	const release: ReleaseRecord = { id: 0, tag_name: "local", draft: true, assets };
+	const inventory = verifyAssets(release, expected);
+	if (!inventory.ok) errors.push(...inventory.errors);
+	try {
+		const content = fs.readFileSync(path.join(distDir, expected.win.feed), "utf8");
+		const metadata = verifyMetadataFiles({ [expected.win.feed]: content }, release, expected);
+		if (!metadata.ok) errors.push(...metadata.errors);
+		else {
+			const feed = yaml.load(content) as { sha512: string };
+			if (feed.sha512 !== fileSha512(path.join(distDir, expected.win.exe))) {
+				errors.push(`${expected.win.feed}: sha512 does not match the actual Windows installer`);
+			}
+		}
+	} catch {
+		errors.push(`cannot read ${expected.win.feed} or its Windows installer`);
+	}
+	return errors;
+}
+
+// ---------------------------------------------------------------------------
 // CLI (thin: parse args, read files, run the pure core, print, exit)
 // ---------------------------------------------------------------------------
 
 function usage(): string {
 	return [
 		"usage:",
+		"  verify-release.ts package <dist-dir> (offline; no tag required)",
 		"  verify-release.ts select <releases.json> --tag <tag>",
 		"  verify-release.ts verify <releases.json> <metadata-dir> --tag <tag>",
 	].join("\n");
@@ -430,13 +509,27 @@ function loadReleases(file: string): { ok: true; releases: ReleaseRecord[] } | {
 
 /** Reads package.json (version) + the composed Builder config from cwd —
  *  the workflow checks out the tagged revision before running the gate. */
-function loadRepoConfig(): { ok: true; pkg: unknown; config: unknown } | { ok: false; errors: Issues } {
+function loadRepoConfig(): { ok: true; pkg: unknown; config: unknown; repository: ReleaseRepository } | { ok: false; errors: Issues } {
 	const pkg = readJson("package.json");
 	if (!pkg.ok) return { ok: false, errors: [pkg.error] };
 	try {
 		const projectDir = process.cwd();
-		const createBuilderConfig = require(path.join(projectDir, "electron-builder.cjs"));
-		return { ok: true, pkg: pkg.value, config: createBuilderConfig({ projectDir }) };
+		const repository = resolveReleaseRepository({ projectDir });
+		if (!repository) throw new Error("Release repository is required");
+		// Use Builder's public default loader (including package.json.build precedence),
+		// not a direct adapter call. Isolate its logs from select's machine JSON;
+		// fd 3 carries only the validated configuration, and is never printed.
+		const loaded = spawnSync(process.execPath, ["-e", `
+			const { Packager } = require(process.argv[1]);
+			const packager = new Packager({ projectDir: process.cwd(), publish: "never" });
+			packager.validateConfig().then(() => require("node:fs").writeFileSync(3, JSON.stringify(packager.config)))
+				.catch(() => { process.exitCode = 1; });
+		`, require.resolve("electron-builder")], {
+			cwd: projectDir, encoding: "utf8", timeout: 60_000,
+			stdio: ["ignore", "pipe", "pipe", "pipe"],
+		});
+		if (loaded.status !== 0) throw new Error("Builder default configuration failed validation");
+		return { ok: true, pkg: pkg.value, config: JSON.parse(String(loaded.output[3])), repository };
 	} catch (error) {
 		return { ok: false, errors: [`cannot load effective Builder configuration: ${String(error)}`] };
 	}
@@ -467,7 +560,7 @@ function parseArgs(argv: string[]): { ok: true; command: string; positional: str
 
 /** Tag ↔ version agreement + release-list load, shared by both commands. */
 function startGate(argv: string[]):
-	| { ok: true; tag: string; version: string; releases: ReleaseRecord[]; config: unknown; pkg: unknown; positional: string[] }
+	| { ok: true; tag: string; version: string; releases: ReleaseRecord[]; config: unknown; pkg: unknown; repository: ReleaseRepository; positional: string[] }
 	| { ok: false; errors: Issues } {
 	const parsed = parseArgs(argv);
 	if (!parsed.ok) return parsed;
@@ -491,11 +584,25 @@ function startGate(argv: string[]):
 		releases: releases.releases,
 		config: repo.config,
 		pkg: repo.pkg,
+		repository: repo.repository,
 		positional: parsed.positional,
 	};
 }
 
 function main(argv: string[]): number {
+	if (argv[0] === "package") {
+		if (argv.length !== 2) return fail([usage()]);
+		const repo = loadRepoConfig();
+		if (!repo.ok) return fail(repo.errors);
+		const version = checkVersion(isPlainObject(repo.pkg) ? repo.pkg.version : undefined);
+		if (!version.ok) return fail(version.errors);
+		const config = verifyConfigAssumptions(repo.config, repo.pkg, repo.repository);
+		if (!config.ok) return fail(config.errors);
+		const errors = verifyWindowsPackage(argv[1]!, expectedAssets(version.version), repo.repository);
+		if (errors.length > 0) return fail(errors);
+		console.log(`OK: Windows package has the selected baked updater, installer, blockmap, and verified ${expectedAssets(version.version).win.feed}.`);
+		return 0;
+	}
 	const start = startGate(argv);
 	if (!start.ok) return fail(start.errors);
 	const expected = expectedAssets(start.version);
@@ -519,7 +626,7 @@ function main(argv: string[]): number {
 	const metadataDir = start.positional[1];
 	if (metadataDir == null) return fail([usage()]);
 	const errors: Issues = [];
-	const assumptions = verifyConfigAssumptions(start.config, start.pkg);
+	const assumptions = verifyConfigAssumptions(start.config, start.pkg, start.repository);
 	if (!assumptions.ok) errors.push(...assumptions.errors);
 	const selection = selectDraft(start.releases, start.tag, start.version);
 	if (!selection.ok) return fail([...errors, ...selection.errors]);

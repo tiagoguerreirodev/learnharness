@@ -23,6 +23,8 @@ jobs:
     name: Release gates
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    outputs:
+      repository: ${{ steps.repository.outputs.repository }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -31,6 +33,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run plugins:setup
+      - name: Resolve and validate release repository
+        id: repository
+        env:
+          LH_RELEASE_REPOSITORY_VARIABLE: ${{ vars.LH_RELEASE_REPOSITORY }}
+        run: node scripts/prepare-release.cjs
       - name: Tag must match package.json
         if: github.event_name == 'push'
         run: |
@@ -87,6 +94,8 @@ jobs:
   package:
     name: Package (${{ matrix.platform }})
     needs: [quality, draft]
+    env:
+      LH_RELEASE_REPOSITORY: ${{ needs.quality.outputs.repository }}
     permissions:
       contents: write
     strategy:
@@ -127,6 +136,8 @@ jobs:
       - name: Windows rehearsal (no publish)
         if: github.event_name == 'workflow_dispatch'
         run: npx electron-builder ${{ matrix.builder_args }} --publish never
+      - name: Verify baked updater and Windows outputs (both release modes)
+        run: npx tsx scripts/verify-release.ts package dist
       - name: Initialize packaged providers offline (host and packaged Electron Node)
         run: |
           payload="dist/win-unpacked/resources/server/standalone"
@@ -154,7 +165,9 @@ jobs:
   # to a release, so there is no draft to verify and the job stays skipped.
   verify:
     name: Verify draft release
-    needs: package
+    needs: [quality, package]
+    env:
+      LH_RELEASE_REPOSITORY: ${{ needs.quality.outputs.repository }}
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
