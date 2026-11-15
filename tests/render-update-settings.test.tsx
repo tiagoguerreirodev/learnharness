@@ -5,7 +5,6 @@ import React, { act } from "react";
 
 import assert from "node:assert/strict";
 import { describe, it, after, afterEach } from "node:test";
-import { readFileSync } from "node:fs";
 import { renderWithInteractionLayers as renderToStaticMarkup } from "./interaction-layer-render.tsx";
 import { InteractionLayersProvider } from "../components/interaction-layers.tsx";
 import { installModalDom } from "./modal-dom.ts";
@@ -14,7 +13,6 @@ import { parseHTML } from "linkedom";
 import { UpdateSettings, updateStatusText, MANUAL_UPDATE_HINT, AUTO_UPDATE_HINT, type UpdateState } from "../components/settings/update-settings.tsx";
 import UpdateBanner from "../components/update-banner.tsx";
 import { SettingsDialogBody, SettingsDialogProvider } from "../components/settings/settings-dialog.tsx";
-import nextConfig from "../next.config.ts";
 
 const dom = parseHTML("<html><body></body></html>");
 Object.assign(globalThis, { window: dom.window, document: dom.document, Element: dom.window.Element,
@@ -24,7 +22,7 @@ after(restoreModalDom);
 const originalFetch = globalThis.fetch;
 const roots: { root: Root; host: HTMLElement }[] = [];
 const state = (over: Partial<UpdateState> = {}): UpdateState => ({ status: "idle", version: null, revision: 0, ...over });
-const props = { autoUpdate: true, onAutoUpdateChange: () => {}, version: "0.3.7", homepage: "https://github.com/amosblomqvist/learnharness" };
+const props = { autoUpdate: true, onAutoUpdateChange: () => {}, version: "0.3.7", releaseRepositoryUrl: "https://github.com/arbitrary-owner/learning-fork" };
 const q = (host: ParentNode, id: string) => host.querySelector<HTMLElement>(`[data-testid='${id}']`);
 
 function deferred<T>() {
@@ -78,11 +76,6 @@ afterEach(async () => {
 });
 
 describe("version and contextual copy", () => {
-	it("build metadata comes from package.json and exposes only public version/homepage values", () => {
-		const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
-		assert.deepEqual(nextConfig.env, { LH_VERSION: pkg.version, LH_HOMEPAGE: pkg.homepage });
-	});
-
 	it("never claims live/latest information and keeps updater errors generic", () => {
 		assert.equal(updateStatusText(null), null);
 		assert.equal(updateStatusText(state()), null);
@@ -98,12 +91,31 @@ describe("version and contextual copy", () => {
 });
 
 describe("General update rows", () => {
-	it("browser/SSR shows version and installed-version release notes, without inactive controls or claims", () => {
+	it("browser/SSR shows version and the fork's Releases page, without inactive controls or claims", () => {
 		const html = renderToStaticMarkup(<UpdateSettings {...props} />);
 		assert.ok(html.includes("Version 0.3.7"));
-		assert.ok(html.includes(`${props.homepage}/releases/tag/v0.3.7`));
+		const link = parseHTML(html).document.querySelector("[data-testid='release-notes']");
+		assert.equal(link?.getAttribute("href"), "https://github.com/arbitrary-owner/learning-fork/releases");
+		assert.equal(link?.getAttribute("target"), "_blank");
+		assert.equal(link?.getAttribute("rel"), "noopener noreferrer");
 		assert.ok(!html.includes("update-check")); assert.ok(!html.includes("row-auto-update"));
 		assert.ok(!html.includes(MANUAL_UPDATE_HINT)); assert.ok(!html.includes("update-status"));
+	});
+
+	it("upstream Release notes opens Releases without assuming a version or tag convention", () => {
+		for (const version of ["0.3.7", "0.6.1-fast-mode", ""]) {
+			const html = renderToStaticMarkup(<UpdateSettings {...props} version={version} releaseRepositoryUrl="https://github.com/amosblomqvist/learnharness" />);
+			const link = parseHTML(html).document.querySelector("[data-testid='release-notes']");
+			assert.equal(link?.getAttribute("href"), "https://github.com/amosblomqvist/learnharness/releases");
+			assert.ok(html.includes(`Version ${version || "unknown"}`));
+		}
+	});
+
+	it("unidentified web builds omit Release notes while retaining version information", () => {
+		const html = renderToStaticMarkup(<UpdateSettings {...props} releaseRepositoryUrl="" />);
+		assert.ok(html.includes("Version 0.3.7"));
+		assert.equal(parseHTML(html).document.querySelector("[data-testid='release-notes']"), null);
+		assert.ok(!html.includes("update-check")); assert.ok(!html.includes("row-auto-update"));
 	});
 
 	it("unpackaged/unavailable updater shows the version-only surface", async () => {
