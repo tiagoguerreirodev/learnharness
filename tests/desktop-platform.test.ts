@@ -303,7 +303,7 @@ describe("workflow action versions", () => {
 			const workflow = yaml.load(readFileSync(new URL(`../.github/workflows/${filename}`, import.meta.url), "utf8"));
 			const expected = ["actions/checkout@v7", "actions/setup-node@v7"];
 			if (filename === "release.yml") {
-				expected.push("actions/github-script@v9", "actions/upload-artifact@v7", "maxim-lobanov/setup-xcode@v1");
+				expected.push("actions/github-script@v9", "actions/upload-artifact@v7");
 			}
 			const observed = new Set<string>();
 			for (const job of Object.values(workflow.jobs)) {
@@ -379,6 +379,7 @@ describe("desktop release workflow", () => {
 		assert.equal(draft.needs, "quality");
 		assert.equal(prepare.if, "github.event_name == 'push'");
 		assert.deepEqual(packaging.needs, ["quality", "draft"]);
+		assert.equal(packaging["runs-on"], "${{ matrix.os }}");
 		assert.equal(workflow.concurrency.group, "release-${{ github.ref }}");
 		assert.equal(workflow.concurrency["cancel-in-progress"], false);
 		for (const filename of ["ci.yml", "release.yml"]) {
@@ -394,19 +395,7 @@ describe("desktop release workflow", () => {
 		}
 	});
 
-	it("pairs Icon Composer packaging with macOS 26 and Xcode selection, retaining macOS 15 CI", () => {
-		const mac = packaging.strategy?.matrix.include.find(entry => entry.platform === "mac-arm64");
-		assert.equal(mac?.os, "macos-26", "actool's .icon compiler needs macOS 26 host frameworks, not just newer Xcode");
-		assert.equal(mac?.builder_args, "--mac --arm64");
-		assert.equal(packaging["runs-on"], "${{ matrix.os }}");
-		const xcodeIndex = packaging.steps.findIndex(step => step.uses === "maxim-lobanov/setup-xcode@v1");
-		assert.ok(xcodeIndex >= 0);
-		const xcode = packaging.steps[xcodeIndex];
-		assert.equal(xcode?.if, "runner.os == 'macOS'");
-		assert.equal(xcode?.with?.["xcode-version"], "latest-stable");
-		const buildIndex = packaging.steps.findIndex(step => step.run?.includes("electron-builder"));
-		assert.ok(buildIndex > xcodeIndex, "select Xcode before packaging compiles the icon");
-
+	it("retains macOS 15 CI", () => {
 		const ci = yaml.load(readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8"));
 		const ciMac = ci.jobs.standalone?.strategy?.matrix.include.find(entry => entry.platform === "mac-arm64");
 		assert.equal(ciMac?.os, "macos-15", "ordinary CI keeps older macOS build/boot coverage");

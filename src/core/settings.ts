@@ -4,20 +4,20 @@
  * (config.SETTINGS_FILE) holding every non-secret product preference.
  *
  * DELTA SEMANTICS (owner decision, 2026-09-19): the record stores EXPLICIT
- * user choices only — ABSENT keys resolve to the factory defaults compiled
+ * user choices only ÔÇö ABSENT keys resolve to the factory defaults compiled
  * into this module (FACTORY_SETTINGS). MODELS are the exception (owner,
- * 2026-09-22 — BYOK all the way down): no factory pins exist, so an absent
+ * 2026-09-22 ÔÇö BYOK all the way down): no factory pins exist, so an absent
  * model key resolves to EMPTY and the per-need gates refuse honestly. A
  * software update that ADDS a knob (new
  * tool, new role, new appearance field) therefore needs no migration: old
  * records simply lack the new keys. `version` is a PRIVATE schema counter
- * for BREAKING shape changes only (field renamed / meaning changed) —
+ * for BREAKING shape changes only (field renamed / meaning changed) ÔÇö
  * unrelated to the app release version. Migrations live in the adapter
  * (src/store/settings.ts), not here.
  *
  * Sanitizer contract (mirrors render-settings.ts discipline): whatever
  * arrives from disk or the network passes through sanitizeUserSettings
- * before use — never trusted raw. Strict on known fields, PRESERVES
+ * before use ÔÇö never trusted raw. Strict on known fields, PRESERVES
  * unknown keys verbatim (a newer record must never be destroyed by an
  * older app reading it). Invalid known values degrade gracefully:
  * out-of-range numbers CLAMP, wrong-typed/invalid fields DROP (resolve to
@@ -44,7 +44,7 @@ import { COLOR_OVERRIDE_KEYS, isThemeId, type AppearanceColorOverrides } from ".
 export const CURRENT_SETTINGS_VERSION = 1;
 
 /** The background-agent roles whose models the Agent settings expose.
- *  The conversation pair (prober/teacher) stays out — chat-controlled via
+ *  The conversation pair (prober/teacher) stays out ÔÇö chat-controlled via
  *  the strong slot (one controller, the model picker). Tests pin the set. */
 export const BACKGROUND_MODEL_ROLES = [
 	"researcher",
@@ -60,22 +60,24 @@ export const BACKGROUND_MODEL_ROLES = [
 
 export type BackgroundModelRole = (typeof BACKGROUND_MODEL_ROLES)[number];
 
-/** A per-role model/thinking override — every field independent (absent
+/** A per-role model/thinking override ÔÇö every field independent (absent
  *  field = that aspect falls back to config.ts's pin for the role). */
 export interface RoleModelOverride {
 	/** The model swap: both coordinates or neither (mirrors ChatSettings.model). */
 	model?: { provider: string; id: string };
 	/** The thinking budget swap. */
 	thinkingLevel?: ThinkingLevel;
+	/** OpenAI Fast for the override's own model (kept only with `model`). */
+	fast?: true;
 }
 
-// ─── Model slots (model slots wave, 2026-09-20) ──────────────────────────────
+// ÔöÇÔöÇÔöÇ Model slots (model slots wave, 2026-09-20) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 
 /** The capability tiers a user can pin models into (owner-settled mapping):
  *  strong = prober + teacher (also the per-session default-teacher
  *  starting point); cheap = researcher, demo-builder, extractor, auditor,
 ; vision = visual-maker + pdf-reader. Resolution per role:
- *  ROLE OVERRIDE → slot → factory pin. */
+ *  ROLE OVERRIDE ÔåÆ slot ÔåÆ factory pin. */
 export const MODEL_SLOTS = ["strong", "cheap", "vision"] as const;
 export type ModelSlotName = (typeof MODEL_SLOTS)[number];
 
@@ -84,11 +86,11 @@ export type ModelSlotName = (typeof MODEL_SLOTS)[number];
  *  to the FIRST entry in this order that the model supports
  *  (getSupportedThinkingLevels); a non-reasoning model resolves "off"
  *  regardless (pi reports exactly ["off"]). EXPLICITLY set levels never
- *  consult this list — they clamp nearest via pi's native
+ *  consult this list ÔÇö they clamp nearest via pi's native
  *  clampThinkingLevel on model switches.
  *
  *  Client surface (interlude, 2026-09-22): this constant lives in the CORE
- *  BARREL — the UI imports it to auto-populate a thinking level on a FRESH
+ *  BARREL ÔÇö the UI imports it to auto-populate a thinking level on a FRESH
  *  model pick (one source of truth, AUTH_KEYS precedent; per-model
  *  supportedLevels already reach the client via the catalog). The ordering
  *  has NO other client role: legacy unset records keep the runtime
@@ -103,14 +105,14 @@ export const DEFAULT_THINKING_ORDER = [
 ] as const satisfies readonly ThinkingLevel[];
 
 /** The machine-readable NOT-CONFIGURED refusal envelope (owner, 2026-09-22):
- *  every per-need gate — the turn gate in chat-handler, a job spawn, a
- *  notes import — refuses with this exact shape. HTTP callers get 503 +
+ *  every per-need gate ÔÇö the turn gate in chat-handler, a job spawn, a
+ *  notes import ÔÇö refuses with this exact shape. HTTP callers get 503 +
  *  this JSON; in-band consumers (the job record's error field) carry the
  *  human `error` line. `missing` names the slot TIER(S) the refused
  *  action needs and found unset. */
 export const MODELS_NOT_CONFIGURED_CODE = "models_not_configured" as const;
 export interface ModelsNotConfigured {
-	/** Human-readable — safe to render as-is. */
+	/** Human-readable ÔÇö safe to render as-is. */
 	error: string;
 	/** The machine discriminator the client switches on. */
 	code: typeof MODELS_NOT_CONFIGURED_CODE;
@@ -119,7 +121,7 @@ export interface ModelsNotConfigured {
 }
 export function modelsNotConfigured(missing: ModelSlotName[]): ModelsNotConfigured {
 	return {
-		error: "No model configured — set up your models first",
+		error: "No model configured ÔÇö set up your models first",
 		code: MODELS_NOT_CONFIGURED_CODE,
 		missing,
 	};
@@ -127,7 +129,7 @@ export function modelsNotConfigured(missing: ModelSlotName[]): ModelsNotConfigur
 
 /** The refusal error text (BYOK, 2026-09-22): job/turn surfaces compose the
  *  record wording around this prefix; UI consumers detect refused work by
- *  it (info tone, not scary-error) — the envelope's home module owns the
+ *  it (info tone, not scary-error) ÔÇö the envelope's home module owns the
  *  string so the writer and the matcher can never drift. */
 export function isModelsRefusal(error: string | undefined): boolean {
 	return !!error && error.startsWith(modelsNotConfigured([]).error);
@@ -145,7 +147,7 @@ export class ModelsNotConfiguredError extends Error {
 }
 
 /** The key-presence refusal (provider-key interlude, owner, 2026-09-25):
- * a PINNED model is not enough — its provider's key must be present, or
+ * a PINNED model is not enough ÔÇö its provider's key must be present, or
  * the action dies mid-stream masked to a generic error. Same envelope
  * family as modelsNotConfigured: HTTP callers get 503 + this JSON;
  * in-band consumers (the job record's error field) carry the human
@@ -153,7 +155,7 @@ export class ModelsNotConfiguredError extends Error {
  * slot tier(s) the refused action resolves to that provider. */
 export const PROVIDER_KEY_MISSING_CODE = "provider_key_missing" as const;
 export interface ProviderKeyMissing {
-	/** Human-readable — safe to render as-is. */
+	/** Human-readable ÔÇö safe to render as-is. */
 	error: string;
 	/** The machine discriminator the client switches on. */
 	code: typeof PROVIDER_KEY_MISSING_CODE;
@@ -162,10 +164,10 @@ export interface ProviderKeyMissing {
 	/** Which slot tiers the refused action resolves to that provider. */
 	slots: ModelSlotName[];
 }
-/** The refusal wording's invariant tail — the matcher below keys on it
+/** The refusal wording's invariant tail ÔÇö the matcher below keys on it
  * (the label prefix varies by provider). */
-const PROVIDER_KEY_MISSING_TAIL = "key is set — add one in Settings → Keys";
-const CLAUDE_CODE_UNAVAILABLE = "Claude Code is unavailable. Enable and set it up in Settings → Providers.";
+const PROVIDER_KEY_MISSING_TAIL = "key is set ÔÇö add one in Settings ÔåÆ Keys";
+const CLAUDE_CODE_UNAVAILABLE = "Claude Code is unavailable. Enable and set it up in Settings ÔåÆ Providers.";
 export function providerKeyMissing(provider: string, slots: ModelSlotName[]): ProviderKeyMissing {
 	const label = AUTH_PROVIDER_KEYS.find((p) => p.id === provider)?.label ?? provider;
 	return {
@@ -177,12 +179,12 @@ export function providerKeyMissing(provider: string, slots: ModelSlotName[]): Pr
 }
 /** The refusal error text (same discipline as isModelsRefusal): UI
  * consumers detect key-refused work by the wording (info tone, not
- * scary-error) — the envelope's home module owns the string so the
+ * scary-error) ÔÇö the envelope's home module owns the string so the
  * writer and the matcher can never drift. */
 export function isProviderKeyRefusal(error: string | undefined): boolean {
 	return !!error && (error.endsWith(PROVIDER_KEY_MISSING_TAIL) || error === CLAUDE_CODE_UNAVAILABLE);
 }
-/** The typed throw for in-process seams (extraction pipeline) — the
+/** The typed throw for in-process seams (extraction pipeline) ÔÇö the
  * ProviderKeyMissing sibling of ModelsNotConfiguredError: callers catch
  * it to skip honestly (trigger) or surface the 503 envelope (routes). */
 export class ProviderKeyMissingError extends Error {
@@ -207,19 +209,21 @@ export interface ModelSlot {
 	model?: { provider: string; id: string };
 	/** Optional thinking level used with this slot's configured model. */
 	thinkingLevel?: ThinkingLevel;
+	/** OpenAI Fast for the slot's own model (kept only with `model`). */
+	fast?: true;
 }
 
 /** The `models` settings section (owner decision 2026-09-20: a dedicated
- *  section — slots are engine-level choices, not one session's). All slots
+ *  section ÔÇö slots are engine-level choices, not one session's). All slots
  *  optional: an absent slot means every role of its tier runs whatever the
- *  deeper tiers of the chain resolve to (per-role override → factory pin). */
+ *  deeper tiers of the chain resolve to (per-role override ÔåÆ factory pin). */
 export interface ModelsSettings {
 	strong?: ModelSlot;
 	cheap?: ModelSlot;
 	vision?: ModelSlot;
 }
 
-// ─── Custom OpenAI-compatible endpoint ───────────────────────────────────────
+// ÔöÇÔöÇÔöÇ Custom OpenAI-compatible endpoint ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 // ONE user-configured OpenAI-compatible server (vLLM / Ollama / a proxy). It is
 // one more provider in the Keys list, keyed by a base URL instead of an env var.
 // NON-SECRET config only (base URL + discovered model ids); the API key is a
@@ -240,17 +244,17 @@ export interface CustomModel {
 	id: string;
 	/** Accepts image input (Vision-capable). Default false (text-only). */
 	image?: boolean;
-	/** Accepts a reasoning effort (thinking). Default false → the only
+	/** Accepts a reasoning effort (thinking). Default false ÔåÆ the only
 	 *  thinking level is "off", exactly like a non-reasoning built-in. */
 	reasoning?: boolean;
-	/** Context window in tokens, from the endpoint. Absent → the default. */
+	/** Context window in tokens, from the endpoint. Absent ÔåÆ the default. */
 	context?: number;
-	/** Max output tokens, from the endpoint. Absent → the default. */
+	/** Max output tokens, from the endpoint. Absent ÔåÆ the default. */
 	maxTokens?: number;
 }
 
 /** A user pin for one custom model: it beats what the endpoint publishes
- *  (owner ruling — explicit user intent wins; a local server's number is
+ *  (owner ruling ÔÇö explicit user intent wins; a local server's number is
  *  often wrong or absent). Absent field = no pin. `reasoning` is tri-state:
  *  true declares reasoning support, false removes that declaration, absent
  *  uses discovery. This is NOT a backend execution/disable switch. */
@@ -272,7 +276,7 @@ export interface CustomProviderSettings {
 	 *  manual ones (rewritten on connect; a failed probe keeps the same
 	 *  endpoint's last snapshot). */
 	models?: CustomModel[];
-	/** User pins keyed by model id — pure user intent, never rewritten by
+	/** User pins keyed by model id ÔÇö pure user intent, never rewritten by
 	 *  discovery, pruned on connect to the ids that connect offers. */
 	overrides?: Record<string, CustomModelOverride>;
 	/** Model ids the user typed by hand, for an endpoint that publishes no
@@ -312,7 +316,7 @@ export function customProviderUsable(
 }
 
 /** First-run gate (model-slots wave, owner 2026-09-20): the app refuses
- *  to start chats until the user has actively picked all three slots —
+ *  to start chats until the user has actively picked all three slots ÔÇö
  *  there ARE no defaults for 33 providers; a configured app is one whose
  *  models section carries a model in every slot. Thinking levels stay
  *  optional (absent = the resolved tier's budget). */
@@ -321,7 +325,7 @@ export function slotsConfigured(models: ModelsSettings | undefined): boolean {
 }
 
 /** Which slot a role draws from (model slots wave, 2026-09-20). Includes the
- *  conversation pair and pdfReader (not BackgroundModelRoles — the slot
+ *  conversation pair and pdfReader (not BackgroundModelRoles ÔÇö the slot
  *  tier spans every role; only background roles surface per-role overrides). */
 export const ROLE_SLOT: Readonly<Record<ModelRole, ModelSlotName>> = {
 	prober: "strong",
@@ -335,7 +339,7 @@ export const ROLE_SLOT: Readonly<Record<ModelRole, ModelSlotName>> = {
 	sideQuestion: "strong", // the conversation chain, like prober/teacher (resolveSideQuestionSpec)
 };
 
-/** General settings — app-level behavior. Version DISPLAY and plans login
+/** General settings ÔÇö app-level behavior. Version DISPLAY and plans login
  *  live outside the record (package.json / auth.json) by owner decision. */
 export interface GeneralSettings {
 	/** Automatic startup/24h update checks (default ON). Manual checks bypass this. */
@@ -347,7 +351,7 @@ export interface DictationSettings {
 	language?: DictationLanguage;
 }
 
-/** Agent settings — everything about the non-conversation machinery. */
+/** Agent settings ÔÇö everything about the non-conversation machinery. */
 export interface AgentSettings {
 	/** Maximum simultaneous background-worker model requests (default 8).
 	 *  Direct conversations bypass this limit. Positive safe integers only:
@@ -356,10 +360,10 @@ export interface AgentSettings {
 	/** Background-role model/thinking overrides (absent role = config pin). */
 	models?: Partial<Record<BackgroundModelRole, RoleModelOverride>>;
 	/** Tool toggles keyed by tool id (absent key = enabled). User-level
-	 *  only — no per-chat override (owner decision 2026-09-19). */
+	 *  only ÔÇö no per-chat override (owner decision 2026-09-19). */
 	tools?: Record<string, boolean>;
 	/** Search-engine preference (search wave, 2026-09-20). OPTIONAL by
-	 *  owner decision: setting a key auto-activates its engine — the user
+	 *  owner decision: setting a key auto-activates its engine ÔÇö the user
 	 *  never chooses an engine to make search work. An explicit choice only
 	 *  pins the preference (e.g. when BOTH keys are present); the chosen
 	 *  engine must still have its key, else search is honestly unavailable.
@@ -367,7 +371,7 @@ export interface AgentSettings {
 	 *  "openai" is the one engine that works only as an explicit choice. */
 	search?: { engine?: SearchEngineId };
 	/** Prober graph tools (wave 7, owner ruling 2026-09-23): read-only
-	 *  knowledge-graph views for the prober agent — a session list +
+	 *  knowledge-graph views for the prober agent ÔÇö a session list +
 	 *  per-session propositions with understanding levels. Its SUBJECT
 	 *  is the graph but its MECHANISM is agent capability (tool
 	 *  registration), so it lives here in its OWN subsection, not in the
@@ -386,10 +390,10 @@ export interface AgentSettings {
 	fileAccess?: FileAccessSettings;
 }
 
-/** Markdown-rendering knobs — the bare-bones set (owner decision). */
+/** Markdown-rendering knobs ÔÇö the bare-bones set (owner decision). */
 export interface MdRenderingSettings {
-	/** Heading font weight (100–900, default 900). CSS resolves the nearest
-	 *  available weight of the chosen font — no font introspection needed. */
+	/** Heading font weight (100ÔÇô900, default 900). CSS resolves the nearest
+	 *  available weight of the chosen font ÔÇö no font introspection needed. */
 	headingWeight?: number;
 	/** Color for **bold** spans (default #ffffff). */
 	boldColor?: string | null;
@@ -397,11 +401,11 @@ export interface MdRenderingSettings {
 	italicColor?: string | null;
 }
 
-/** Appearance settings — theme, color overrides, type, markdown emphasis. */
+/** Appearance settings ÔÇö theme, color overrides, type, markdown emphasis. */
 export interface AppearanceSettings {
 	/** The active theme id (core/themes.ts presets or a custom file under
 	 *  THEMES_DIR). Absent or gone = "default". The theme declares the
-	 *  mode (dark/light) — the old `mode`/`lightBackground` keys are no
+	 *  mode (dark/light) ÔÇö the old `mode`/`lightBackground` keys are no
 	 *  longer read (theme wave, 2026-11-04). */
 	theme?: string;
 	/** The background override (null = the theme's). Kept at its pre-theme
@@ -411,59 +415,59 @@ export interface AppearanceSettings {
 	 *  Preserved across theme switches. Bold/italic live in mdRendering. */
 	colors?: AppearanceColorOverrides;
 	/** The main reading font (everything that is Source Sans 3 today), by
-	 *  name — user-chosen from installed fonts. null = Source Sans 3. */
+	 *  name ÔÇö user-chosen from installed fonts. null = Source Sans 3. */
 	fontFamily?: string | null;
-	/** Reading font size in px (12–24, default 16). Headings render as
+	/** Reading font size in px (12ÔÇô24, default 16). Headings render as
 	 *  multiples of this, so one knob scales the document coherently. */
 	proseFontSize?: number;
 	/** Permit normal font ligatures in code (including inline code and code editors). Default false; prose is unaffected. */
 	codeLigatures?: boolean;
-	/** Session names in CMU Serif (default true — today's look). */
+	/** Session names in CMU Serif (default true ÔÇö today's look). */
 	sessionNameSerif?: boolean;
 	mdRendering?: MdRenderingSettings;
 }
 
-/** Knowledge-graph settings — a strict dependency ladder (owner decision
- *  2026-09-19): graph → embedding → clustering → labeling, each rung only
+/** Knowledge-graph settings ÔÇö a strict dependency ladder (owner decision
+ *  2026-09-19): graph ÔåÆ embedding ÔåÆ clustering ÔåÆ labeling, each rung only
  *  meaningful when its parent is on (the UI grays dependents out; stored
  *  values persist but resolve inert). All default true. */
 export interface GraphSettings {
 	/** MASTER (and, since wave 7, ONLY): off = no extraction, no auditor.
 	 *  The wave-7 collapse (owner ruling 2026-09-23) deleted the three
-	 *  subordinate rungs — embedding/clustering/labeling — and the BYOK
+	 *  subordinate rungs ÔÇö embedding/clustering/labeling ÔÇö and the BYOK
 	 *  embeddingModel: clustering is the free birth-session partition
 	 *  derived on read (core/session-clusters.ts), labels ARE session
-	 *  names, and the prober graph tools read the ledgers directly — there
+	 *  names, and the prober graph tools read the ledgers directly ÔÇö there
 	 *  is nothing left to configure. Data stays stored either way. */
 	enabled?: boolean;
-	/** GRAPH RENDERING (owner, 2026-10-06 — the release graph-controls
+	/** GRAPH RENDERING (owner, 2026-10-06 ÔÇö the release graph-controls
 	 *  round): gates ONLY the home's main view. Off = the home shows the
 	 *  chains view instead of the canvas; the ledgers, the extraction
-	 *  pipeline, and every write path are untouched — this is a display
+	 *  pipeline, and every write path are untouched ÔÇö this is a display
 	 *  switch, not a data switch (the extraction master above is the
 	 *  data switch). Default on. */
 	rendering?: boolean;
 	/** The chunk budget (extraction-UX redesign, owner 2026-09-24): the
-	 *  transcript-token share of the extractor's context — a run fires
+	 *  transcript-token share of the extractor's context ÔÇö a run fires
 	 *  when a chat's UNCOVERED tokens reach it, and the run batches the
-	 *  oldest uncovered messages into runs of ≤ this many tokens. It
+	 *  oldest uncovered messages into runs of Ôëñ this many tokens. It
 	 *  bounds both cost and chunk size (the extractor prompt also
 	 *  carries the whole graph + instructions, so a smaller budget means
-	 *  more, smaller runs — each paying that fixed overhead).
+	 *  more, smaller runs ÔÇö each paying that fixed overhead).
 	 *
 	 *  FACTORY DEFAULT 4096 (owner, 2026-10-13: halved back from the
-	 *  digest-era 8192 — the labeled passages + message anchors made
+	 *  digest-era 8192 ÔÇö the labeled passages + message anchors made
 	 *  smaller batches worth their overhead again; the pre-setting
 	 *  constant was 4096, vision-extraction-coverage.md, 2026-09-15).
 	 *  Only the FACTORY moves: an explicit user value always wins.
 	 *
 	 *  FLOOR 500 (EXTRACTION_CHUNK_TOKENS_FLOOR, the implementer's call
 	 *  per the owner's dispatch): every run pays the graph-carrying
-	 *  prompt overhead out of the write channel's money — a budget below
+	 *  prompt overhead out of the write channel's money ÔÇö a budget below
 	 *  ~500 tokens would fire penny-batches that cost more per extracted
 	 *  token than the content is worth, so the sanitizer clamps and the
 	 *  PUT rejects below it. NO CEILING on purpose: a large budget just
-	 *  delays extraction — the user's stated cost/thoroughness tradeoff,
+	 *  delays extraction ÔÇö the user's stated cost/thoroughness tradeoff,
 	 *  not a misconfiguration to police. */
 	extractionChunkTokens?: number;
 }
@@ -471,14 +475,14 @@ export interface GraphSettings {
 /**
  * COMPACTION (owner round 14, 2026-10-05): the context-fitting mechanic's
  * user-facing controls: the trigger threshold and opt-in reasoning accounting.
- * The effective trigger is min(this, model contextWindow − 16k reserve)
+ * The effective trigger is min(this, model contextWindow ÔêÆ 16k reserve)
  * (owner ruling: on big models the setting rules; on small ones the
  * window rules before the provider overflows).
  *
  * FACTORY DEFAULT 150_000 (owner ruling).
  *
  * FLOOR 32_000 (implementer's call, the chunk-budget discipline): below
- * the kept tail (20k) + a summary the chat would re-compact every turn —
+ * the kept tail (20k) + a summary the chat would re-compact every turn ÔÇö
  * a burn, not a preference. NO CEILING: a huge threshold just means "fit
  * everything" until the window rule binds.
  */
@@ -509,10 +513,10 @@ export interface UserSettings {
 }
 
 /** Factory defaults for everything core can pin (owner decisions
- *  2026-09-19). NO factory models exist anywhere (owner, 2026-09-22 — BYOK
+ *  2026-09-19). NO factory models exist anywhere (owner, 2026-09-22 ÔÇö BYOK
  *  all the way down): the chat section and every slot stay empty until the
  *  user picks, and the per-need gates refuse honestly; tools default on;
- *  prompts default off — hence their absence here. */
+ *  prompts default off ÔÇö hence their absence here. */
 export interface FactorySettings {
 	version: number;
 	agent: Required<Pick<AgentSettings, "workerRequestConcurrency">>;
@@ -556,18 +560,18 @@ export const FACTORY_SETTINGS: FactorySettings = {
 };
 
 /** The chunk budget's validated floor (GraphSettings.extractionChunkTokens
- *  — see its doc for the penny-batch rationale; the settings PUT names this
+ *  ÔÇö see its doc for the penny-batch rationale; the settings PUT names this
  *  in its rejection, the sanitizer clamps to it). */
 export const EXTRACTION_CHUNK_TOKENS_FLOOR = 500;
 
-// ─── Sanitizer ─────────────────────────────────────────────────────────────
+// ÔöÇÔöÇÔöÇ Sanitizer ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 
 const PROSE_FONT_MIN = 12;
 const PROSE_FONT_MAX = 24;
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
 
-/** #rgb / #rrggbb (case-insensitive) — the only color format we accept. */
+/** #rgb / #rrggbb (case-insensitive) ÔÇö the only color format we accept. */
 export function isHexColor(value: string): boolean {
 	return /^#[0-9a-fA-F]{3}$/.test(value) || /^#[0-9a-fA-F]{6}$/.test(value);
 }
@@ -619,11 +623,12 @@ function sanitizeRoleOverride(raw: unknown): RoleModelOverride | undefined {
 	if (typeof r.thinkingLevel === "string" && THINKING_LEVELS.includes(r.thinkingLevel as ThinkingLevel)) {
 		out.thinkingLevel = r.thinkingLevel as ThinkingLevel;
 	}
+	if (r.fast === true && out.model) out.fast = true;
 	return Object.keys(out).length ? out : undefined;
 }
 
 /** The models section (model slots wave, 2026-09-20): each slot keeps
- *  only well-formed parts — the same shape rules as a role override, so a
+ *  only well-formed parts ÔÇö the same shape rules as a role override, so a
  *  stale client can't park junk in a slot. */
 function sanitizeModels(raw: Record<string, unknown>): ModelsSettings {
 	const out: ModelsSettings = {};
@@ -639,7 +644,7 @@ function sanitizeModels(raw: Record<string, unknown>): ModelsSettings {
 	return out;
 }
 
-/** A positive integer, or undefined — keeps only meaningful token counts. */
+/** A positive integer, or undefined ÔÇö keeps only meaningful token counts. */
 function positiveInt(value: unknown): number | undefined {
 	return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
 }
@@ -676,7 +681,7 @@ export function sanitizeCustomModelOverrides(
 	return out;
 }
 
-/** The customProvider section: normalized base URL (invalid → dropped) and
+/** The customProvider section: normalized base URL (invalid ÔåÆ dropped) and
  *  discovered models (ids trimmed, dupes/empties dropped; image kept only when
  *  true; token counts only as positive ints). Clamp-never-reject. */
 function sanitizeCustomProvider(raw: Record<string, unknown>): CustomProviderSettings {
@@ -743,13 +748,13 @@ function sanitizeAgent(raw: Record<string, unknown>): AgentSettings {
 	const prompts = sanitizeBooleanMap(raw.prompts);
 	if (prompts) out.prompts = prompts;
 	// Search preference: lenient read side (an unknown engine id drops;
-	// the write side's parser is strict — a stale client can't brick the
+	// the write side's parser is strict ÔÇö a stale client can't brick the
 	// record, it just loses the pin and auto-detection resumes).
 	if (raw.search !== null && typeof raw.search === "object" && !Array.isArray(raw.search)) {
 		const engine = (raw.search as Record<string, unknown>).engine;
 		if (isSearchEngineId(engine)) out.search = { engine };
 	}
-	// Prober graph tools (wave 7): its own agent-section subsection —
+	// Prober graph tools (wave 7): its own agent-section subsection ÔÇö
 	// lenient read side (a bad shape drops the key and the default ON
 	// resumes; the write side's parser is strict).
 	if (raw.graphTools !== null && typeof raw.graphTools === "object" && !Array.isArray(raw.graphTools)) {
@@ -782,7 +787,7 @@ function sanitizeMdRendering(raw: unknown): MdRenderingSettings {
 function sanitizeAppearance(raw: Record<string, unknown>): AppearanceSettings {
 	const out: AppearanceSettings = {};
 	// Theme wave (2026-11-04): `mode`/`lightBackground` (light-mode wave)
-	// are no longer read — the theme declares the mode. Dropped here like
+	// are no longer read ÔÇö the theme declares the mode. Dropped here like
 	// the graph's dead rungs; the next appearance write flushes them.
 	if (isThemeId(raw.theme)) out.theme = raw.theme;
 	if (raw.background !== undefined) out.background = sanitizeHexOrNull(raw.background);
@@ -812,16 +817,16 @@ function sanitizeGraph(raw: Record<string, unknown>): GraphSettings {
 	// Wave 7 collapse (owner ruling 2026-09-23): the section is the master
 	// switch ONLY. The dead rungs' keys (embedding/clustering/labeling/
 	// embeddingModel) in existing records are simply UNREAD and DROPPED by
-	// this reconstruction — the migration story: the next graph-section
+	// this reconstruction ÔÇö the migration story: the next graph-section
 	// write (PUT is replace-whole) persists the collapsed shape, and no
 	// active code ever looks at the stale fields.
 	//
 	// extractionChunkTokens (extraction-UX redesign, 2026-09-24): the chunk
-	// budget — clamp-never-reject (the bd68486 discipline): a finite
+	// budget ÔÇö clamp-never-reject (the bd68486 discipline): a finite
 	// positive number floors to EXTRACTION_CHUNK_TOKENS_FLOOR (fractions
 	// floor to integers), anything else drops to the factory default at
 	// resolution. A disk record below the floor (older app, hand edit)
-	// clamps UP — the floor is a cost protection, not data to honor.
+	// clamps UP ÔÇö the floor is a cost protection, not data to honor.
 	const out: GraphSettings = {};
 	const enabled = boolOrDrop(raw.enabled);
 	if (enabled !== undefined) out.enabled = enabled;
@@ -855,7 +860,7 @@ function sanitizeCompaction(raw: Record<string, unknown>): CompactionSettings {
  * Coerce arbitrary JSON (disk file, network body) into a valid delta record:
  * known fields validated strictly (invalid ones drop/clamp per module doc),
  * UNKNOWN KEYS PRESERVED VERBATIM (a newer record must survive an older
- * app). Never throws. Non-objects → null.
+ * app). Never throws. Non-objects ÔåÆ null.
  */
 export function sanitizeUserSettings(raw: unknown): UserSettings | null {
 	if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
@@ -901,7 +906,7 @@ export function sanitizeUserSettings(raw: unknown): UserSettings | null {
 	// Unknown top-level keys ride along untouched (forward-compat). One
 	// known-DEAD key is stripped instead of riding: `chat` (the old
 	// default-settings section) died with per-session models (owner,
-	// 2026-09-28) — a fossil copy on disk must never resurrect through
+	// 2026-09-28) ÔÇö a fossil copy on disk must never resurrect through
 	// reads (and any later write flushes it from the file for good).
 	for (const [key, value] of Object.entries(r)) {
 		if (key === "chat") continue;

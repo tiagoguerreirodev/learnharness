@@ -24,6 +24,9 @@ export interface ModelCatalogEntry {
 	/** Null for native CLI aliases whose effective limits are session-specific. */
 	contextWindow: number | null;
 	maxTokens: number | null;
+	/** ChatGPT-account models only: the Fast (priority) service tier the
+	 * account catalog offers, with OpenAI's own description. Absent = no Fast. */
+	fast?: { description: string };
 }
 
 /** Conversation default resolved from the strong slot, used for new sessions
@@ -32,6 +35,8 @@ export interface ModelCatalogEntry {
 export interface CatalogDefaults {
 	model: { provider: string; id: string };
 	thinkingLevel?: ThinkingLevel;
+	/** ChatGPT Fast pin (service_tier "priority"); follows the model. */
+	fast?: true;
 }
 
 /** Resolved model choice per background role: role override, then its assigned
@@ -39,7 +44,7 @@ export interface CatalogDefaults {
  * is unavailable; there is no implicit factory model fallback. */
 export type RolePins = Record<
 	BackgroundModelRole,
-	{ model: { provider: string; id: string }; thinkingLevel?: ThinkingLevel } | null
+	{ model: { provider: string; id: string }; thinkingLevel?: ThinkingLevel; fast?: true } | null
 >;
 
 /** Resolved model choice for each slot tier. Null means that tier has no model;

@@ -16,7 +16,7 @@ export async function openAIWebSearch(query: string, count: number, { model: job
 	const chatgpt = job?.provider === "chatgpt";
 	const model = chatgpt ? chatGPTModel(job.id) : job?.provider === "openai" ? models.getModel(job.provider, job.id) : undefined;
 	if (!model) throw new Error("OpenAI web search needs a researcher model on an OpenAI API key or ChatGPT connection");
-	const route = chatgpt ? chatGPTStream(() => true, undefined, ["web_search"]) : models.streamSimple.bind(models);
+	const route = chatgpt ? chatGPTStream(() => true, undefined, undefined, ["web_search"]) : models.streamSimple.bind(models);
 	// The lowest effort the model can search at. A model that cannot turn
 	// reasoning off would otherwise run at the provider's default; "low",
 	// not "minimal", because hosted search is refused at minimal effort.

@@ -1,10 +1,10 @@
 /**
  * Tests for the section parsers (settings-storage wave, 2026-09-19):
- * src/server/settings-body.ts — general/agent/appearance/graph strictness.
+ * src/server/settings-body.ts ÔÇö general/agent/appearance/graph strictness.
  * Same discipline as parseSettingsBody (its tests live in
  * default-settings.test.ts): every known field is strict (bad type/shape
- * → 400-style error, never a silent clamp), unknown keys drop, absent
- * fields mean absent overrides. Pure — no fs.
+ * ÔåÆ 400-style error, never a silent clamp), unknown keys drop, absent
+ * fields mean absent overrides. Pure ÔÇö no fs.
  */
 
 import assert from "node:assert/strict";
@@ -16,6 +16,7 @@ import {
 	parseGeneralSettingsBody,
 	parseCompactionSettingsBody,
 	parseGraphSettingsBody,
+	parseSettingsBody,
 	SETTINGS_SECTIONS,
 } from "../src/server/settings-body.ts";
 
@@ -77,7 +78,7 @@ describe("parseAgentSettingsBody", () => {
 		assert.equal(parseAgentSettingsBody({ tools: { quiz: "no" } }).ok, false);
 		assert.equal(parseAgentSettingsBody({ prompts: { "x.md": 1 } }).ok, false);
 		// switch validity (segment membership, file presence) is the ROUTE's
-		// cross-validation — the parser only sees shapes.
+		// cross-validation ÔÇö the parser only sees shapes.
 	});
 
 	it("search: recognizes Exa, Firecrawl, and Ollama and rejects unknown engines", () => {
@@ -106,7 +107,7 @@ describe("parseAgentSettingsBody", () => {
 		assert.equal(parseAgentSettingsBody({ search: { engine: 1 } }).ok, false);
 	});
 
-	it("graphTools: strict object subsection, enabled boolean when present — wave 7, 2026-09-23", () => {
+	it("graphTools: strict object subsection, enabled boolean when present ÔÇö wave 7, 2026-09-23", () => {
 		const off = parseAgentSettingsBody({ graphTools: { enabled: false } });
 		assert.ok(off.ok);
 		assert.deepEqual(off.settings.graphTools, { enabled: false });
@@ -146,7 +147,7 @@ describe("parseAppearanceSettingsBody", () => {
 		});
 	});
 
-	it("rejects bad enums, ranges, and colors — with specific messages, never clamps", () => {
+	it("rejects bad enums, ranges, and colors ÔÇö with specific messages, never clamps", () => {
 		const cases: unknown[] = [
 			{ theme: "Sepia!" },
 			{ background: "blue" },
@@ -168,7 +169,7 @@ describe("parseAppearanceSettingsBody", () => {
 		assert.ok(parseAppearanceSettingsBody({ mdRendering: { headingWeight: 100 } }));
 		assert.ok(parseAppearanceSettingsBody({ mdRendering: { headingWeight: 900 } }));
 		assert.ok(parseAppearanceSettingsBody({ background: "#abc" }));
-		// null = "the theme's color" — explicit, valid
+		// null = "the theme's color" ÔÇö explicit, valid
 		assert.ok(parseAppearanceSettingsBody({ background: null, fontFamily: null }));
 	});
 
@@ -176,7 +177,7 @@ describe("parseAppearanceSettingsBody", () => {
 		const ok = parseAppearanceSettingsBody({ theme: "rose-pine-dawn", colors: { warning: "#f0f0f0", error: null } });
 		assert.ok(ok.ok);
 		assert.deepEqual(ok.ok && ok.settings, { theme: "rose-pine-dawn", colors: { warning: "#f0f0f0", error: null } });
-		const badTheme = parseAppearanceSettingsBody({ theme: "Rosé Pine" });
+		const badTheme = parseAppearanceSettingsBody({ theme: "Ros├® Pine" });
 		assert.equal(badTheme.ok, false);
 		assert.match(!badTheme.ok ? badTheme.error : "", /theme must be a theme id/);
 		const unknownColor = parseAppearanceSettingsBody({ colors: { sepia: "#000000" } });
@@ -211,7 +212,7 @@ describe("parseGraphSettingsBody", () => {
 		assert.equal(parseGraphSettingsBody("nope").ok, false);
 	});
 
-	it("rendering (2026-10-06): boolean display switch — replace-whole like every sibling", () => {
+	it("rendering (2026-10-06): boolean display switch ÔÇö replace-whole like every sibling", () => {
 		const off = parseGraphSettingsBody({ enabled: true, rendering: false });
 		assert.ok(off.ok);
 		assert.deepEqual(off.settings, { enabled: true, rendering: false });
@@ -222,11 +223,11 @@ describe("parseGraphSettingsBody", () => {
 		assert.equal(parseGraphSettingsBody({ rendering: "off" }).ok, false, "rendering must be a boolean");
 	});
 
-	it("extractionChunkTokens: whole tokens ≥ the 500 floor (extraction-UX redesign, 2026-09-24)", () => {
+	it("extractionChunkTokens: whole tokens ÔëÑ the 500 floor (extraction-UX redesign, 2026-09-24)", () => {
 		const ok = parseGraphSettingsBody({ enabled: true, extractionChunkTokens: 2048 });
 		assert.ok(ok.ok);
 		assert.deepEqual(ok.settings, { enabled: true, extractionChunkTokens: 2048 });
-		// absent = unset — replace-whole keeps the factory default at resolution
+		// absent = unset ÔÇö replace-whole keeps the factory default at resolution
 		const absent = parseGraphSettingsBody({ enabled: true });
 		assert.ok(absent.ok);
 		assert.deepEqual(absent.settings, { enabled: true });
@@ -244,9 +245,9 @@ describe("parseGraphSettingsBody", () => {
 		assert.equal(parseGraphSettingsBody({ extractionChunkTokens: null }).ok, false);
 	});
 
-	it("the dead wave-6 rungs in a body are ignored — the section collapses on write", () => {
-		// Old clients may still send {embedding: true, embeddingModel: …};
-		// the parser reads ONLY the master switch — the dead keys are not
+	it("the dead wave-6 rungs in a body are ignored ÔÇö the section collapses on write", () => {
+		// Old clients may still send {embedding: true, embeddingModel: ÔÇª};
+		// the parser reads ONLY the master switch ÔÇö the dead keys are not
 		// an error, they are just not part of the section anymore.
 		const r = parseGraphSettingsBody({ enabled: false, clustering: true, labeling: true });
 		assert.ok(r.ok);
@@ -290,7 +291,7 @@ describe("parseCompactionSettingsBody (owner round 14)", () => {
 
 describe("SETTINGS_SECTIONS (the route's section map)", () => {
 	it("maps exactly the eight record sections", () => {
-		// compaction joined (owner round 14): its own section PUT — the
+		// compaction joined (owner round 14): its own section PUT ÔÇö the
 		// threshold is engine behavior, not an agent-section key. The custom
 		// endpoint is NOT a section: it is one more provider in the Keys list,
 		// connected through POST /api/custom-provider.
@@ -302,7 +303,7 @@ describe("SETTINGS_SECTIONS (the route's section map)", () => {
 });
 
 describe("parseModelsSettingsBody (model slots wave, 2026-09-20)", () => {
-	it("parses the three slot tiers — model required, level rides (BYOK, owner 2026-09-22)", () => {
+	it("parses the three slot tiers ÔÇö model required, level rides (BYOK, owner 2026-09-22)", () => {
 		const r = parseModelsSettingsBody({
 			strong: { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } },
 			cheap: { model: { provider: "zai", id: "glm-5.3-flash" }, thinkingLevel: "high" },
@@ -345,4 +346,58 @@ describe("parseModelsSettingsBody (model slots wave, 2026-09-20)", () => {
 		assert.equal(parseModelsSettingsBody({ vision: { thinkingLevel: 7 } }).ok, false);
 		assert.equal(parseModelsSettingsBody("nope").ok, false);
 	});
+});
+
+describe("Fast pins in the settings bodies (OpenAI Fast mode, S6/S9)", () => {
+	const sol = { provider: "chatgpt", id: "gpt-6.1-sol" };
+
+	it("parseSettingsBody: fast true rides the model; false is stored as absent", () => {
+		assert.deepEqual(parseSettingsBody({ model: sol, thinkingLevel: "high", fast: true }), {
+			ok: true,
+			settings: { model: sol, thinkingLevel: "high", fast: true },
+		});
+		assert.deepEqual(parseSettingsBody({ model: sol, fast: false }), { ok: true, settings: { model: sol } });
+	});
+
+	it("parseSettingsBody: a non-boolean fast and a model-less fast are rejected", () => {
+		assert.deepEqual(parseSettingsBody({ model: sol, fast: "yes" }), { ok: false, error: "fast must be a boolean" });
+		assert.deepEqual(parseSettingsBody({ thinkingLevel: "high", fast: true }), { ok: false, error: "fast requires a model" });
+	});
+
+	it("parseModelsSettingsBody: fast rides a slot's model, prefixed errors otherwise", () => {
+		assert.deepEqual(parseModelsSettingsBody({ strong: { model: sol, fast: true }, cheap: { model: sol, fast: false } }), {
+			ok: true,
+			settings: { strong: { model: sol, fast: true }, cheap: { model: sol } },
+		});
+		assert.deepEqual(parseModelsSettingsBody({ strong: { model: sol, fast: 1 } }), { ok: false, error: "strong.fast must be a boolean" });
+		assert.deepEqual(parseModelsSettingsBody({ vision: { fast: true } }), { ok: false, error: "vision.fast requires a model" });
+	});
+
+	it("parseAgentSettingsBody: role overrides take fast with the same rules", () => {
+		assert.deepEqual(parseAgentSettingsBody({ models: { researcher: { model: sol, fast: true }, auditor: { model: sol, fast: false } } }), {
+			ok: true,
+			settings: { models: { researcher: { model: sol, fast: true }, auditor: { model: sol } } },
+		});
+		assert.deepEqual(parseAgentSettingsBody({ models: { researcher: { model: sol, fast: null } } }), { ok: false, error: "researcher.fast must be a boolean" });
+		assert.deepEqual(parseAgentSettingsBody({ models: { extractor: { thinkingLevel: "low", fast: true } } }), { ok: false, error: "extractor.fast requires a model" });
+	});
+
+	it("bodies without fast parse exactly as before (S9)", () => {
+		assert.deepEqual(parseSettingsBody({ model: sol, thinkingLevel: "low" }), { ok: true, settings: { model: sol, thinkingLevel: "low" } });
+		assert.deepEqual(parseModelsSettingsBody({ strong: { model: sol, thinkingLevel: "low", cacheRetention: "long" } }), {
+			ok: true,
+			settings: { strong: { model: sol, thinkingLevel: "low", cacheRetention: "long" } },
+		});
+		assert.deepEqual(parseAgentSettingsBody({ models: { researcher: { thinkingLevel: "low" } } }), {
+			ok: true,
+			settings: { models: { researcher: { thinkingLevel: "low" } } },
+		});
+	});
+});
+
+it("fast:false parses exactly like an absent fast (S9)", () => {
+	const m = { provider: "chatgpt", id: "gpt-5.5" };
+	assert.deepEqual(parseSettingsBody({ model: m, thinkingLevel: "high", fast: false }), parseSettingsBody({ model: m, thinkingLevel: "high" }));
+	assert.deepEqual(parseModelsSettingsBody({ strong: { model: m, fast: false } }), parseModelsSettingsBody({ strong: { model: m } }));
+	assert.deepEqual(parseAgentSettingsBody({ models: { researcher: { model: m, fast: false } } }), parseAgentSettingsBody({ models: { researcher: { model: m } } }));
 });

@@ -2,53 +2,53 @@
 /**
  * The Agent section (settings-app wave): the THREE MODEL SLOTS, the tool
  * toggles + the search-engine preference, and the prompt override
- * switches — three GROUPS (owner, 2026-09-20: clear separation — Models /
+ * switches ÔÇö three GROUPS (owner, 2026-09-20: clear separation ÔÇö Models /
  * Tools / System prompts).
  *
- * Model slots (model-slots wave, 2026-09-20, owner ruling: SLOTS ONLY —
+ * Model slots (model-slots wave, 2026-09-20, owner ruling: SLOTS ONLY ÔÇö
  * the six per-role rows disappeared; per-role overrides remain in the
  * schema for a future advanced surface): Strong = Prober + Teacher, Cheap
  * = the five workhorse roles, Vision = Visual maker + PDF reader. Each
  * slot row carries the shared dropdown (fuzzy search, arrow-walk, Enter
- * pick — ModelMenuList/ThinkingMenuList from ./model-menu.tsx) over the
+ * pick ÔÇö ModelMenuList/ThinkingMenuList from ./model-menu.tsx) over the
  * FEDERATED catalog (/api/models serves only keyed providers, fresh per
- * call — saving a key in Keys immediately widens this picker). The
+ * call ÔÇö saving a key in Keys immediately widens this picker). The
  * vision slot filters to image-capable models (Model.input). The slots
- * live in the `models` settings section (PUT /api/settings/models — slot
+ * live in the `models` settings section (PUT /api/settings/models ÔÇö slot
  * pins are engine-level, not per-chat); the rest of the section writes
- * the `agent` section as before. Resolution per tier: slot override →
- * factory pin (GET /api/models' `slots` — resolved, cannot drift from
+ * the `agent` section as before. Resolution per tier: slot override ÔåÆ
+ * factory pin (GET /api/models' `slots` ÔÇö resolved, cannot drift from
  * what runs). The Default row clears the slot override; a stored id stays
- * VISIBLE even when its provider's key lapsed out of the catalog — a
+ * VISIBLE even when its provider's key lapsed out of the catalog ÔÇö a
  * trigger showing "Default" over a live override would lie about the
  * record.
  *
- * Search engine (search wave, 2026-09-20, owner: no default — an engine
+ * Search engine (search wave, 2026-09-20, owner: no default ÔÇö an engine
  * is live iff its key is present; with a key the engine AUTO-activates,
  * the explicit choice is only a preference between live engines): a row
  * in the Tools group, with the same shared-menu look and
- * the live reason line from /api/search. No engine key at all → the row
+ * the live reason line from /api/search. No engine key at all ÔåÆ the row
  * grays whole-row (a choice without a key would only BLOCK another
  * engine's auto-activation). A keyless engine (OpenAI web search) is the
  * exception: it is offered while the current settings can run it, and
  * never auto-activates.
  *
- * Tools — the owner's final list (2026-09-19): research, demo, visual, pdf.
+ * Tools ÔÇö the owner's final list (2026-09-19): research, demo, visual, pdf.
  * Absent key = enabled in the schema; the UI writes explicit booleans for
  * all four (simpler to reason about, sanitize-equivalent).
  *
- * Prompts: GET /api/settings/prompts segments — Teacher, Prober, Practice,
+ * Prompts: GET /api/settings/prompts segments ÔÇö Teacher, Prober, Practice,
  * then Shared LAST. The server returns each agent's actual segments,
  * including its shared subset; sectionedSegments deduplicates shared
  * chunks and derives per-fragment usage from membership in those lists.
  * The row rulings: only the TOGGLE
  * grays when there's no override file (the file name is always
  * full-contrast); NO description line when there's no override (the empty
- * state is clean — toggle + name); the indicator ("Your version is
+ * state is clean ÔÇö toggle + name); the indicator ("Your version is
  * saved") appears ONLY when an override exists. The switch requires an
  * override FILE (route-enforced), so a file-less toggle is disabled.
  * The segments view re-reads on the 'lh:settings-saved' signal for the
- * agent section — the view's enabled flags derive from the record's
+ * agent section ÔÇö the view's enabled flags derive from the record's
  * switches, and the 2026-09-26 state-echo bug was exactly this reader
  * missing (the toggle painted its old state until a remount re-fetched).
  */
@@ -82,11 +82,11 @@ import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { prettyModel } from "@/components/usage-format";
 import { cn } from "@/lib/utils";
 import { SettingsGroup, SettingsRow, SettingsMenuTrigger, Toggle, CommitInput } from "./controls.tsx";
-import { ModelMenuList, ThinkingMenuList } from "./model-menu";
+import { FastBolt, ModelMenuList, ThinkingMenuList } from "./model-menu";
 import { ChatGPTBackgroundAccess, useChatGPTBackgroundAllowed } from "./chatgpt-connection";
 import { NativeSubscriptionBackgroundAccess } from "./subscription-connections";
 
-/** One slot's display identity — the tier's roster as the row hint rides
+/** One slot's display identity ÔÇö the tier's roster as the row hint rides
  *  with the resolved default (owner: the hint ALWAYS names the default). */
 const SLOT_META: Record<ModelSlotName, { label: string; roster: string }> = {
 	strong: { label: "Strong", roster: "The main model for your sessions" },
@@ -95,7 +95,7 @@ const SLOT_META: Record<ModelSlotName, { label: string; roster: string }> = {
 };
 
 /** The owner's final toggleable-tool list (confirm with the user before
- *  changing — the Teacher stream settled this 2026-09-19). */
+ *  changing ÔÇö the Teacher stream settled this 2026-09-19). */
 export const TOGGLE_TOOLS = ["research", "demo", "visual", "pdf"] as const;
 
 const THINKING_LEVELS: readonly ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
@@ -113,13 +113,13 @@ type PromptView = Record<"teacher" | "prober" | "practice", SegmentInfo[]>;
 type PromptRow = SegmentInfo & { usageHint?: string };
 
 /** Compose: one tool toggled, the rest of the section carried verbatim.
- *  Pure — exported for tests. */
+ *  Pure ÔÇö exported for tests. */
 export function composeTool(agent: AgentSettings | undefined, id: string, on: boolean): AgentSettings {
 	return { ...agent, tools: { ...agent?.tools, [id]: on } };
 }
 
 /** A file-access folder entry the server will accept: absolute (POSIX or
- *  Windows drive/UNC) or "~"-anchored. Pure — exported for tests. */
+ *  Windows drive/UNC) or "~"-anchored. Pure ÔÇö exported for tests. */
 export function isFolderEntry(folder: string): boolean { return isFileAccessFolder(folder); }
 
 /** The switch changes ONLY restriction, never discards saved folders. */
@@ -128,7 +128,7 @@ export function composeFileRestriction(agent: AgentSettings | undefined, restric
 }
 
 /** Compose: add one allowed folder (trimmed; duplicates and invalid entries
- *  are no-ops). Pure — exported for tests. */
+ *  are no-ops). Pure ÔÇö exported for tests. */
 export function composeAddFolder(agent: AgentSettings | undefined, folder: string): AgentSettings {
 	const next = folder.trim();
 	const folders = agent?.fileAccess?.folders ?? [];
@@ -144,7 +144,7 @@ export function composeRemoveFolder(agent: AgentSettings | undefined, folder: st
 
 /** Parse the numeric draft and compose the WHOLE agent section. Empty
  *  removes the override; invalid input never writes, rounds, or clamps.
- *  Pure — exported for tests. */
+ *  Pure ÔÇö exported for tests. */
 export function composeWorkerRequestConcurrency(
 	agent: AgentSettings | undefined,
 	value: string,
@@ -174,32 +174,35 @@ export function composeWorkerRequestConcurrency(
 }
 
 /** The quizzing mechanics (owner 2026-09-27): a segmented control, not a
- *  toggle — exactly one mechanic is ever active. `explain: true` arms
+ *  toggle ÔÇö exactly one mechanic is ever active. `explain: true` arms
  *  free-recall (explain in, quiz out); anything else is multiple choice.
- *  `quiz` itself is never written (mechanics-managed — see quizMechanics
- *  in agent/tools.ts). Pure — exported for tests. */
+ *  `quiz` itself is never written (mechanics-managed ÔÇö see quizMechanics
+ *  in agent/tools.ts). Pure ÔÇö exported for tests. */
 export function composeQuizMechanics(agent: AgentSettings | undefined, mechanics: "choice" | "free"): AgentSettings {
 	return { ...agent, tools: { ...agent?.tools, explain: mechanics === "free" } };
 }
 
 /** Compose the prober graph-tools toggle (wave 7): its own key in the
- *  agent section — never in the tool-toggles map (owner ruling). Absent =
+ *  agent section ÔÇö never in the tool-toggles map (owner ruling). Absent =
  *  ON (the toggle discipline); the write is explicit either way, so an
- *  explicit-off record stays visible as stored. Pure — exported for tests. */
+ *  explicit-off record stays visible as stored. Pure ÔÇö exported for tests. */
 export function composeGraphTools(agent: AgentSettings | undefined, on: boolean): AgentSettings {
 	return { ...agent, graphTools: { enabled: on } };
 }
 
 /** Compose: one slot's model/thinking override. Empty model = absent
- *  override (Default — falls to the factory pin); empty thinking = the
+ *  override (Default ÔÇö falls to the factory pin); empty thinking = the
  *  tier keeps its resolved thinking budget. Per-field independence, same
- *  as the schema's ModelSlot. Pure — exported for tests. */
+ *  as the schema's ModelSlot. `fast` is the pin's OpenAI Fast as the
+ *  caller means it (a thinking edit passes the stored one); it is kept
+ *  only with a model. Pure ÔÇö exported for tests. */
 export function composeSlotModel(
 	models: ModelsSettings | undefined,
 	slot: ModelSlotName,
 	provider: string,
 	id: string,
 	thinking: string,
+	fast = false,
 ): ModelsSettings {
 	const prev = models?.[slot];
 	const next = { ...models };
@@ -211,6 +214,7 @@ export function composeSlotModel(
 		...(prev?.cacheRetention !== undefined ? { cacheRetention: prev.cacheRetention } : {}),
 		...(provider && id ? { model: { provider, id } } : prev?.model ? { model: prev.model } : {}),
 		...(thinking ? { thinkingLevel: thinking as ThinkingLevel } : {}),
+		...(fast && ((provider && id) || prev?.model) ? { fast: true as const } : {}),
 	};
 	return next;
 }
@@ -224,8 +228,8 @@ export function composeSlotCacheRetention(models: ModelsSettings | undefined, sl
 }
 
 /** Compose: the search-engine preference. null = the explicit pin is
- *  REMOVED (auto-activation takes over — the schema's resting state).
- *  Pure — exported for tests. */
+ *  REMOVED (auto-activation takes over ÔÇö the schema's resting state).
+ *  Pure ÔÇö exported for tests. */
 export function composeSearchEngine(
 	agent: AgentSettings | undefined,
 	engine: SearchEngineId | null,
@@ -240,7 +244,7 @@ export function composeSearchEngine(
 
 /** The indicator under a row whose override IS the version in use (owner
  *  ruling, refined 2026-09-26: the small text states WHICH VERSION IS
- *  IN USE — "Your version is in use" when the switch is on, and NOTHING
+ *  IN USE ÔÇö "Your version is in use" when the switch is on, and NOTHING
  *  when the default composes, even if a saved override sits on disk
  *  unused. The switch's meaning becomes legible: it visibly controls
  *  this line). Exported for the pin. */
@@ -256,7 +260,7 @@ export interface PromptSection {
 /** Keep each agent's own assembly order, then list shared chunks once.
  *  Usage is derived from the API's actual per-agent membership, never a
  *  second copy of the runtime's Practice shared-fragment allowlist.
- *  Pure — exported for tests. */
+ *  Pure ÔÇö exported for tests. */
 export function sectionedSegments(view: PromptView): PromptSection[] {
 	const agents = [
 		{ id: "teacher", label: "Teacher" },
@@ -285,7 +289,7 @@ export function sectionedSegments(view: PromptView): PromptSection[] {
 
 /** Compose: one prompt switch. on = explicit true; off = key REMOVED
  *  (absent = off is the schema's resting state; explicit false is the
- *  same thing but noisier). Pure — tests. */
+ *  same thing but noisier). Pure ÔÇö tests. */
 export function composePromptSwitch(agent: AgentSettings | undefined, path: string, on: boolean): AgentSettings {
 	const prompts = { ...agent?.prompts };
 	if (on) prompts[path] = true;
@@ -294,7 +298,7 @@ export function composePromptSwitch(agent: AgentSettings | undefined, path: stri
 }
 
 /** The collapsed select look (owner: "the look of the collapsed menu is
- *  good") — now a button that opens the shared model-picker dropdown. */
+ *  good") ÔÇö now a button that opens the shared model-picker dropdown. */
 function MenuTrigger({
 	value,
 	emptyLabel,
@@ -305,9 +309,12 @@ function MenuTrigger({
 	widthClass,
 	disabled,
 	hint,
+	icon,
 }: {
 	value: string;
 	hint?: string;
+	/** A mark after the value (the model trigger's Fast bolt). */
+	icon?: React.ReactNode;
 	/** What the trigger shows when there is no override ("Default"). */
 	emptyLabel: string;
 	ariaLabel: string;
@@ -316,7 +323,7 @@ function MenuTrigger({
 	onClick: () => void;
 	/** Owner (2026-09-20): the thinking trigger is FIXED at the width the
 	 *  Default state needs (values shifting it mid-edit shifted the row);
-	 *  the model trigger takes the same width as a MINIMUM — its values
+	 *  the model trigger takes the same width as a MINIMUM ÔÇö its values
 	 *  genuinely vary in length. */
 	widthClass: string;
 	/** The no-key search state grays the whole row; the trigger follows. */
@@ -325,6 +332,7 @@ function MenuTrigger({
 	const button = (
 		<SettingsMenuTrigger
 			value={value || emptyLabel}
+			icon={icon}
 			aria-label={ariaLabel}
 			aria-expanded={open}
 			data-testid={testid}
@@ -341,7 +349,7 @@ function MenuTrigger({
 /* The section's dropdowns all mount the shared MenuShell (fix wave chunk
  * B): portaled to document.body, fixed-anchored to the open trigger by
  * testid (the section's one-ref pattern), opening DOWN with the shell's
- * viewport cap and auto-flip. data-lh-menu rides the shell — the
+ * viewport cap and auto-flip. data-lh-menu rides the shell ÔÇö the
  * outside-click contract's exemption mark. */
 
 export function AgentSection({
@@ -356,18 +364,18 @@ export function AgentSection({
 }: {
 	agent: AgentSettings | undefined;
 	fileAccessError?: string | null;
-	/** The `models` section (slot pins — engine-level, PUT /api/settings/models). */
+	/** The `models` section (slot pins ÔÇö engine-level, PUT /api/settings/models). */
 	models: ModelsSettings | undefined;
-	/** The `graph` section — READ ONLY here: the graphTools row composes its
+	/** The `graph` section ÔÇö READ ONLY here: the graphTools row composes its
 	 *  master switch (graph.enabled off dims + disables the row; the
 	 *  effective gate is server-side, per-turn fresh). */
 	graph: GraphSettings | undefined;
-	/** The `compaction` section — its own PUT (the threshold is engine
+	/** The `compaction` section ÔÇö its own PUT (the threshold is engine
 	 *  behavior, not an agent-section key; owner round 14, Agent tab). */
 	compaction: CompactionSettings | undefined;
 	/** Writes the composed WHOLE agent section (replace-PUT discipline). */
 	onSectionChange: (next: AgentSettings) => boolean | Promise<boolean>;
-	/** Writes the composed models section (slots — replace-PUT discipline). */
+	/** Writes the composed models section (slots ÔÇö replace-PUT discipline). */
 	onModelsChange: (next: ModelsSettings) => void;
 	/** Writes the whole compaction section (replace-PUT discipline). */
 	onCompactionChange: (next: CompactionSettings) => boolean | Promise<boolean>;
@@ -375,11 +383,11 @@ export function AgentSection({
 	const { catalog: body, failed: catalogFailed, refresh: refreshCatalog } = useModelCatalog();
 	const catalog = body?.models;
 	const slots = body?.slots;
-	/** The live search state (/api/search) — the row's reason line. */
+	/** The live search state (/api/search) ÔÇö the row's reason line. */
 	const [folderInput, setFolderInput] = useState("");
 	const [folderError, setFolderError] = useState<string | null>(null);
 	const [search, setSearch] = useState<SearchStatus | null>(null);
-	/** Which search engines have a key (/api/keys) — the no-keys-anywhere
+	/** Which search engines have a key (/api/keys) ÔÇö the no-keys-anywhere
 	 *  state grays the row; per-engine marks ride the menu rows. */
 	const [engineKeys, setEngineKeys] = useState<Partial<Record<SearchEngineId, boolean>>>({});
 	const [prompts, setPrompts] = useState<PromptView | null>(null);
@@ -400,7 +408,7 @@ export function AgentSection({
 			.then((body: SearchStatus) => setSearch(body))
 			.catch(() => setSearch(null));
 
-	/** Re-read the prompt-segment view — the signal seam for the
+	/** Re-read the prompt-segment view ÔÇö the signal seam for the
 	 *  2026-09-26 state-echo fix: the view's `enabled` flags DERIVE from
 	 *  the settings record's agent switches (the toggle's truth lives
 	 *  here, not in the `agent` prop), so an agent-section write must
@@ -418,7 +426,7 @@ export function AgentSection({
 	// keys/models signal. Settings props still own saved selections/levels.
 	useSettingsSaved((section) => {
 		// THE state-echo root cause: the prompt switches write through the
-		// agent section, but this view (the toggles' truth) never re-read —
+		// agent section, but this view (the toggles' truth) never re-read ÔÇö
 		// the settings-saved law (every reader re-reads) was missing this
 		// one reader.
 		if (section === "agent") readPrompts();
@@ -441,7 +449,7 @@ export function AgentSection({
 			.catch(() => {});
 	}, []);
 
-	// The reason line re-reads /api/search AFTER an engine write lands —
+	// The reason line re-reads /api/search AFTER an engine write lands ÔÇö
 	// the write updates the `agent` prop (the dialog's record mirror), so
 	// keying on the pin avoids the race where the fetch beat the PUT and
 	// the hint contradicted the trigger it sits under. The researcher's
@@ -454,7 +462,7 @@ export function AgentSection({
 	}, [agent?.search?.engine, researcherProvider, chatGPTBackground]);
 
 	// The dropdown contract (the chat model selector's, mirrored): any
-	// click outside the open menu — or an Esc — closes it. Esc is CLAIMED
+	// click outside the open menu ÔÇö or an Esc ÔÇö closes it. Esc is CLAIMED
 	// with stopPropagation so the settings dialog behind does NOT also
 	// close. A pointerdown on the backdrop is left for the dialog (its own
 	// click closes everything); a click inside the dialog just closes us.
@@ -469,7 +477,7 @@ export function AgentSection({
 			if (target instanceof Element && target.closest('[role="dialog"]')) {
 				setOpenMenu(null);
 			}
-			// else: outside the dialog — the dialog's own close handles it.
+			// else: outside the dialog ÔÇö the dialog's own close handles it.
 		};
 		document.addEventListener("pointerdown", onPointerDown);
 		return () => document.removeEventListener("pointerdown", onPointerDown);
@@ -489,12 +497,12 @@ export function AgentSection({
 		readPrompts();
 		setSegmentStatus("Saved");
 		// Auto-on (owner ruling, refined 2026-09-26): writing an override and
-		// putting it to work are ONE action — a save with the switch off was
+		// putting it to work are ONE action ÔÇö a save with the switch off was
 		// the "did something, changed nothing" trap (the composed prompt
 		// stayed the default). The file exists now, so the ON switch the
 		// agent-section validation requires is legal; the order (file, then
 		// switch) is the safe one. Saving an edit while already on rides
-		// through — the switch write is idempotent at the record level.
+		// through ÔÇö the switch write is idempotent at the record level.
 		if (agent?.prompts?.[path] !== true) {
 			onSectionChange(composePromptSwitch(agent, path, true));
 		}
@@ -507,10 +515,10 @@ export function AgentSection({
 			setSegmentStatus(`Delete failed: ${res.status}`);
 			return;
 		}
-		// Auto-off — the mirror of save's auto-on: deleting the file while
+		// Auto-off ÔÇö the mirror of save's auto-on: deleting the file while
 		// the switch is on would orphan an ON record switch (the agent-section
 		// validation 400s every later write while the UI's toggle can no
-		// longer reach the OFF escape hatch — the trap found in live verify
+		// longer reach the OFF escape hatch ÔÇö the trap found in live verify
 		// 2026-09-26). Composing the OFF here keeps the record clean.
 		if (agent?.prompts?.[path] === true) {
 			onSectionChange(composePromptSwitch(agent, path, false));
@@ -519,7 +527,7 @@ export function AgentSection({
 		setSegmentStatus("Deleted");
 	}
 
-		/** The search-engine menu row — label + the quiet readiness mark
+		/** The search-engine menu row ÔÇö label + the quiet readiness mark
 		 *  (null = Automatic, which only ticks when active). */
 	const engineOption = (
 		id: SearchEngineId | "auto",
@@ -539,7 +547,7 @@ export function AgentSection({
 		>
 			<span>{label}</span>
 			<span className="text-muted-foreground">
-				{(mark ?? active) && <span aria-hidden>{mark ?? "✓"}</span>}
+				{(mark ?? active) && <span aria-hidden>{mark ?? "Ô£ô"}</span>}
 			</span>
 		</button>
 	);
@@ -548,7 +556,7 @@ export function AgentSection({
 		const fileExists = info.overrideText !== null;
 		const open = openSegment === info.path;
 		// The Save affordance (owner ruling, refined 2026-09-26): clickable
-		// only when there's something to save — the draft differs from
+		// only when there's something to save ÔÇö the draft differs from
 		// what's on disk. An unchanged editor shows a grayed, inert Save
 		// (the always-active button was the "doesn't feel like it does
 		// anything" half of the report).
@@ -559,16 +567,16 @@ export function AgentSection({
 				<SettingsRow
 					label={info.path}
 					// Overhaul rulings (2026-09-26, refined): the small text
-					// states WHICH VERSION IS IN USE — nothing when the
+					// states WHICH VERSION IS IN USE ÔÇö nothing when the
 					// default composes (even with a saved override sitting
 					// on disk unused), "Your version is in use" when the
 					// switch is on. The switch's meaning becomes legible
 					// through this line.
-					hint={[info.usageHint, info.enabled ? PROMPT_IN_USE_HINT : undefined].filter(Boolean).join(" · ") || undefined}
+					hint={[info.usageHint, info.enabled ? PROMPT_IN_USE_HINT : undefined].filter(Boolean).join(" ┬À ") || undefined}
 					testid={`prompt-row-${info.path}`}
 				>
 					{/* Graying ruling: ONLY the toggle dims without an
-					    override file — the file name above stays
+					    override file ÔÇö the file name above stays
 					    full-contrast (the whole-row dim is dead). */}
 					<span className={fileExists ? undefined : "opacity-40"}>
 						<Toggle
@@ -606,7 +614,7 @@ export function AgentSection({
 								value={segmentDraft[info.path] ?? info.overrideText ?? ""}
 								onChange={(e) => setSegmentDraft({ ...segmentDraft, [info.path]: e.target.value })}
 								aria-label="Your version of the instructions"
-								placeholder="Add your own instructions…"
+								placeholder="Add your own instructionsÔÇª"
 								className="h-24 w-full resize-y rounded-sm border border-border bg-background p-2 font-ui text-xs text-foreground outline-none"
 							/>
 						</div>
@@ -632,7 +640,7 @@ export function AgentSection({
 									Delete
 								</button>
 							)}
-							{/* The quiet inline confirmation — next to the
+							{/* The quiet inline confirmation ÔÇö next to the
 							    action, not the old path-echoing line at the
 							    section's bottom (production-copy: no file
 							    paths in user-facing status). One editor is
@@ -676,9 +684,10 @@ export function AgentSection({
 					const modelId = override?.model?.id ?? "";
 					const provider = override?.model?.provider ?? "";
 					const thinking = override?.thinkingLevel ?? "";
+					const fast = override?.fast === true;
 					// The tier's resolved pin is machinery only now (owner, fix
-					// wave): the UI never names the factory fallback — the hint
-					// carries the roster, the triggers read "—" when unpicked — but
+					// wave): the UI never names the factory fallback ÔÇö the hint
+					// carries the roster, the triggers read "ÔÇö" when unpicked ÔÇö but
 					// the pin still governs the thinking level LIST when no override
 					// names a model to read levels from.
 					const pin = slots?.[slot];
@@ -688,6 +697,8 @@ export function AgentSection({
 					const coord = override?.model ?? pin?.model;
 					const chosen = coord ? catalog?.find((m) => m.id === coord.id && m.provider === coord.provider) : undefined;
 					const levels = chosen ? chosen.supportedLevels : THINKING_LEVELS;
+					// ÔÜí only while the catalog still offers Fast (S5: it then runs standard).
+					const fastShown = fast && override?.model !== undefined && chosen?.fast !== undefined;
 					const thisMenuOpen = openMenu?.target === slot ? openMenu.kind : null;
 					return (
 						<SettingsRow
@@ -705,8 +716,9 @@ export function AgentSection({
 								{slot !== "strong" && <><ChatGPTBackgroundAccess provider={coord?.provider} /><NativeSubscriptionBackgroundAccess provider={coord?.provider} /></>}
 								<MenuTrigger
 									value={modelId ? prettyModel(modelId) : ""}
-									hint={modelId ? `${provider}:${modelId}` : undefined}
-									emptyLabel="—"
+									icon={fastShown ? <FastBolt /> : undefined}
+									hint={modelId ? `${provider}:${modelId}${fastShown ? " ┬À Fast" : ""}` : undefined}
+									emptyLabel="ÔÇö"
 									ariaLabel={`${SLOT_META[slot].label} model`}
 									testid={`slot-model-${slot}`}
 									open={thisMenuOpen === "model"}
@@ -715,10 +727,10 @@ export function AgentSection({
 								/>
 								<MenuTrigger
 									// Legacy display (chunk 2 item 4): no stored level + a known
-									// model → the RESOLVED level (the ordering's first supported —
+									// model ÔåÆ the RESOLVED level (the ordering's first supported ÔÇö
 									// what the engine build runs). Display-only until a pick writes.
 									value={thinking || (chosen ? defaultOrderLevel(levels) : "")}
-									emptyLabel="—"
+									emptyLabel="ÔÇö"
 									ariaLabel={`${SLOT_META[slot].label} thinking`}
 									testid={`slot-thinking-${slot}`}
 									open={thisMenuOpen === "thinking"}
@@ -759,18 +771,19 @@ export function AgentSection({
 											models={catalog ?? undefined}
 											effectiveId={modelId}
 											effectiveProvider={provider}
+											effectiveFast={fastShown}
 											vision={slot === "vision"}
-											onPick={(entry) => {
+											onPick={(entry, pickedFast) => {
 												// Auto-populate (chunk 2, owner: "populate everywhere"): the
-												// fresh pick writes a level — the stored one rides as-is
+												// fresh pick writes a level ÔÇö the stored one rides as-is
 												// (the write clamps server-side), else the ordering's level.
 												const next = populateLevel(thinking || undefined, entry.supportedLevels);
-												onModelsChange(composeSlotModel(models, slot, entry.provider, entry.id, next));
+												onModelsChange(composeSlotModel(models, slot, entry.provider, entry.id, next, pickedFast));
 												setOpenMenu(null);
 											}}
 											footer={
 												catalog && catalog.length === 0
-													? "No models — add a provider key in Keys"
+													? "No models ÔÇö add a provider key in Keys"
 													: "Runs every agent of this tier"
 											}
 										/>
@@ -786,11 +799,11 @@ export function AgentSection({
 									>
 										<ThinkingMenuList
 											levels={levels.map(String)}
-											// The ✓ sits on the RESOLVED level for legacy unset records —
+											// The Ô£ô sits on the RESOLVED level for legacy unset records ÔÇö
 											// the same one the trigger shows.
 											effectiveLevel={thinking || (chosen ? defaultOrderLevel(levels) : undefined)}
 											onPick={(level) => {
-												onModelsChange(composeSlotModel(models, slot, provider, modelId, level));
+												onModelsChange(composeSlotModel(models, slot, provider, modelId, level, fast));
 												setOpenMenu(null);
 											}}
 										/>
@@ -838,11 +851,11 @@ export function AgentSection({
 
 			<SettingsGroup label="Tools" testid="group-tools">
 				{/* The prober's graph tools (wave 7, owner ruling 2026-09-23):
-				    FIRST row of the group — its subject is the map, its
+				    FIRST row of the group ÔÇö its subject is the map, its
 				    mechanism is agent capability, so it lives in Tools but
 				    NOT in the tool-toggles list. Its own agent-section key
 				    (agent.graphTools), the search-row hint discipline: a
-				    smaller line under it explaining what it is — this
+				    smaller line under it explaining what it is ÔÇö this
 				    connects prior sessions' knowledge into new ones. */}
 				{(() => {
 					const graphOn = graph?.enabled ?? true;
@@ -862,7 +875,7 @@ export function AgentSection({
 						</SettingsRow>
 					);
 				})()}
-				{/* The quizzing mechanic (owner 2026-09-27): segmented — exactly one
+				{/* The quizzing mechanic (owner 2026-09-27): segmented ÔÇö exactly one
 				    of Multiple choice / Free recall is active; the choice swaps which
 				    quizzing tool BOTH agents carry (prober checks + teach checks).
 				    Persisted as agent.tools.explain; absent = Multiple choice. */}
@@ -905,7 +918,7 @@ export function AgentSection({
 				{TOGGLE_TOOLS.map((id) => (
 					<SettingsRow
 						key={id}
-						label={`Tool · ${id}`}
+						label={`Tool ┬À ${id}`}
 						testid={`tool-row-${id}`}
 					>
 						<Toggle
@@ -997,8 +1010,8 @@ export function AgentSection({
 										})}
 										{offered.map(({ id, label, envVar }) => {
 											const mark = envVar !== null
-												? engineKeys[id] ? "✓ key" : "· no key"
-												: search?.keyless?.[id] === "ready" ? "✓ available" : "· unavailable";
+												? engineKeys[id] ? "Ô£ô key" : "┬À no key"
+												: search?.keyless?.[id] === "ready" ? "Ô£ô available" : "┬À unavailable";
 											return engineOption(id, label, engine === id, mark, () => {
 												onSectionChange(composeSearchEngine(agent, id));
 												setOpenMenu(null);
@@ -1033,8 +1046,8 @@ export function AgentSection({
 							const n = Number(v);
 							if (!Number.isFinite(n) || n <= 0) return false; // bad input: no write
 							// Mirror the server floor (anti-churn: each compaction
-							// keeps a ~20k-token tail); no ceiling — the effective
-							// trigger is min(threshold, contextWindow − 16k) anyway.
+							// keeps a ~20k-token tail); no ceiling ÔÇö the effective
+							// trigger is min(threshold, contextWindow ÔêÆ 16k) anyway.
 							return onCompactionChange({
 								...compaction,
 								thresholdTokens: Math.max(COMPACTION_THRESHOLD_FLOOR, Math.round(n)),
@@ -1057,10 +1070,10 @@ export function AgentSection({
 
 			<SettingsGroup label="System prompts" testid="group-prompts">
 				{prompts === null ? (
-					<p className="text-xs text-muted-foreground/70">Loading prompt segments…</p>
+					<p className="text-xs text-muted-foreground/70">Loading prompt segmentsÔÇª</p>
 				) : (
 					<div className="flex flex-col gap-4">
-						{/* Teacher, Prober, Practice, Shared — shared chunks once,
+						{/* Teacher, Prober, Practice, Shared ÔÇö shared chunks once,
 						    each agent's own section in prompt-assembly order. */}
 						{sectionedSegments(prompts).map((section) => (
 							<div key={section.id} data-testid={`prompt-section-${section.id}`}>

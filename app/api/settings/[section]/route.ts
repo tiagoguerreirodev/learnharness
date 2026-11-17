@@ -44,6 +44,7 @@ import {
 	themeStore,
 	validateChatSettings,
 	validateModelsSettings,
+	validateRoleOverridesFast,
 	writeSettingsRecord,
 	type SettingsBodyResult,
 } from "@/src/server";
@@ -109,6 +110,8 @@ export async function PUT(request: Request, ctx: { params: Promise<{ section: st
 		// mirrored back by every write while the disabled toggle couldn't
 		// reach the OFF escape hatch. An ON with a real file stays valid.
 		const agent = parsed.settings as AgentSettings;
+		const fastVerdict = validateRoleOverridesFast(agent.models, record.agent?.models);
+		if (!fastVerdict.ok) return Response.json({ error: fastVerdict.error }, { status: 400 });
 		const segments = new Set(allSegmentPaths());
 		const orphans: string[] = [];
 		for (const [path, on] of Object.entries(agent.prompts ?? {})) {

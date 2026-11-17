@@ -7,7 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { backgroundCaptureDir, backgroundCaptureStream, createBackgroundCapture } from "../src/agent/background-capture.ts";
 import { piModels, piEngineForSpec } from "../src/agent/models.ts";
-import { chatGPTAbortController, chatGPTModels, refreshChatGPTModels } from "../src/agent/chatgpt-bridge.ts";
+import { chatGPTAbortController, chatGPTFastTier, chatGPTModels, refreshChatGPTModels } from "../src/agent/chatgpt-bridge.ts";
 import { chatGPTHistory, chatGPTPayload } from "../src/agent/chatgpt-stream.ts";
 import { openAIWebSearch } from "../src/agent/openai-web-search.ts";
 
@@ -20,10 +20,13 @@ let leaseError: string | null = null;
 let requests: { authorization: string | null; body: Record<string, any>; url: string }[] = [];
 let responseEvents: unknown[] = [];
 let responseStatus = 200;
+const fastCatalog = () => [{ id: model.id, name: "Scratch account model", fast: { description: "2x speed, increased usage" } }, { id: "unknown-capabilities", name: "Do not invent capabilities", fast: { description: "1.5x speed" } }];
+let catalogModels: unknown[] = [];
 const ipc = (value: unknown) => (process.emit as (name: string, value: unknown) => boolean)("message", value);
 const model = piModels().getModel("openai", "gpt-5") as Model<"openai-responses">;
 const status = { available: true, pending: false, allowBackgroundUse: false, activeId: "scratch-account", accounts: [{ id: "scratch-account", email: "dummy@example.invalid", registration: "oaiapp_scratch", connected: true, planEnabled: true, background: false }], error: null };
 before(async () => {
+	catalogModels = fastCatalog();
 	process.env.LH_DESKTOP_SERVER = "1"; process.env.LH_DESKTOP_API_SECRET = "d".repeat(64);
 	assert(model);
 	process.env.OPENAI_API_KEY = "sk-scratch-must-never-be-used";
@@ -31,7 +34,7 @@ before(async () => {
 	Object.defineProperty(process, "send", { configurable: true, value: (message: any, callback?: () => void) => {
 		queueMicrotask(() => {
 			ipc({ channel: "lh:chatgpt", id: message.id, op: message.op,
-				...(message.op === "lease" && leaseError ? { ok: false, error: leaseError, stamp: { epoch: 1, authorityRevision: 1, revision: 1 } } : { ok: true, value: message.op === "lease" ? { accessToken: "scratch-oauth-only", accountId: "scratch-account", epoch: 1, authorityRevision: 1, revision: 1 } : { epoch: 1, authorityRevision: 1, revision: 1, status, accountId: "scratch-account", models: [{ id: model.id, name: "Scratch account model" }, { id: "unknown-capabilities", name: "Do not invent capabilities" }] } }),
+				...(message.op === "lease" && leaseError ? { ok: false, error: leaseError, stamp: { epoch: 1, authorityRevision: 1, revision: 1 } } : { ok: true, value: message.op === "lease" ? { accessToken: "scratch-oauth-only", accountId: "scratch-account", epoch: 1, authorityRevision: 1, revision: 1 } : { epoch: 1, authorityRevision: 1, revision: 1, status, accountId: "scratch-account", models: catalogModels } }),
 			});
 		});
 		callback?.(); return true;
@@ -136,7 +139,44 @@ test("consent revocation cancels only applicable background streams and preserve
 	foreground.release(); background.release();
 });
 
+test("Fast tier metadata is kept only for supported catalog models", () => {
+	assert.deepEqual(chatGPTFastTier(model.id), { description: "2x speed, increased usage" });
+	assert.equal(chatGPTFastTier("unknown-capabilities"), undefined);
+});
+
+test("model DTO carries Fast only for ChatGPT-account models that offer it", async () => {
+	const { toModelDto } = await import("../src/server/model-catalog.ts");
+	assert.deepEqual(toModelDto(chatGPTModels()[0]!).fast, { description: "2x speed, increased usage" });
+	assert.equal("fast" in toModelDto(model), false);
+});
+
+const sentBody = async (spec: Parameters<typeof piEngineForSpec>[0]) => {
+	const engine = piEngineForSpec(spec, false);
+	requests = []; responseEvents = [complete()];
+	for await (const _ of engine.streamFn(engine.model, context(), {})) { /* drain */ }
+	assert.equal(requests.length, 1);
+	return requests[0]!.body;
+};
+
+test("a Fast pin sends service_tier priority; a plain pin sends no service_tier", async () => {
+	assert.equal((await sentBody({ provider: "chatgpt", id: model.id, fast: true })).service_tier, "priority");
+	assert.equal("service_tier" in (await sentBody({ provider: "chatgpt", id: model.id })), false);
+});
+
+test("a Fast pin falls back to the standard tier when the catalog stops offering Fast", async () => {
+	catalogModels = [{ id: model.id, name: "Scratch account model" }];
+	try {
+		await refreshChatGPTModels([model]);
+		assert.equal(chatGPTFastTier(model.id), undefined);
+		const body = await sentBody({ provider: "chatgpt", id: model.id, fast: true });
+		assert.equal("service_tier" in body, false);
+		assert.equal(body.model, model.id);
+	} finally { catalogModels = fastCatalog(); await refreshChatGPTModels([model]); }
+});
+
 test("payload sanitizer omits unsupported fields and rejects unsupported hosted tools", () => {
+	assert.equal(chatGPTPayload({ input: [], service_tier: "priority" }, "scratch").service_tier, undefined);
+	assert.equal(chatGPTPayload({ input: [] }, "scratch", "priority").service_tier, "priority");
 	assert.deepEqual(chatGPTPayload({ model: "scratch", input: [], stream: false, store: true, metadata: { test: true }, previous_response_id: "old", background: true }, "scratch"), { model: "scratch", input: [], stream: true, store: false });
 	assert.throws(() => chatGPTPayload({ input: [], tools: [{ type: "tool_search" }] }, "scratch"), /Unsupported/);
 });
@@ -144,9 +184,12 @@ test("payload sanitizer omits unsupported fields and rejects unsupported hosted 
 test("a hosted tool passes only when the stream's creator allows its type, beside the namespaced local tools", () => {
 	const local = { type: "function", name: "scratch_tool" }, hosted = { type: "web_search" };
 	assert.throws(() => chatGPTPayload({ input: [], tools: [local, hosted] }, "scratch"), /Unsupported/);
-	assert.throws(() => chatGPTPayload({ input: [], tools: [hosted, { type: "tool_search" }] }, "scratch", ["web_search"]), /Unsupported/);
-	assert.deepEqual(chatGPTPayload({ input: [], tools: [hosted] }, "scratch", ["web_search"]).tools, [hosted]);
-	assert.deepEqual(chatGPTPayload({ input: [], tools: [hosted, local] }, "scratch", ["web_search"]).tools, [{ type: "namespace", name: "learnharness", description: "LearnHarness local learning tools", tools: [local] }, hosted]);
+	assert.throws(() => chatGPTPayload({ input: [], tools: [hosted, { type: "tool_search" }] }, "scratch", undefined, ["web_search"]), /Unsupported/);
+	assert.deepEqual(chatGPTPayload({ input: [], tools: [hosted] }, "scratch", undefined, ["web_search"]).tools, [hosted]);
+	assert.deepEqual(chatGPTPayload({ input: [], tools: [hosted, local] }, "scratch", undefined, ["web_search"]).tools, [{ type: "namespace", name: "learnharness", description: "LearnHarness local learning tools", tools: [local] }, hosted]);
+	const prioritySearch = chatGPTPayload({ input: [], tools: [hosted], service_tier: "default" }, "scratch", "priority", ["web_search"]);
+	assert.equal(prioritySearch.service_tier, "priority");
+	assert.deepEqual(prioritySearch.tools, [hosted]);
 });
 
 for (const { provider, authorization } of [{ provider: "chatgpt", authorization: "Bearer scratch-oauth-only" }, { provider: "openai", authorization: "Bearer sk-scratch-must-never-be-used" }] as const) {
