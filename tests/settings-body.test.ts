@@ -1,10 +1,10 @@
 /**
  * Tests for the section parsers (settings-storage wave, 2026-09-19):
- * src/server/settings-body.ts ÔÇö general/agent/appearance/graph strictness.
+ * src/server/settings-body.ts — general/agent/appearance/graph strictness.
  * Same discipline as parseSettingsBody (its tests live in
  * default-settings.test.ts): every known field is strict (bad type/shape
- * ÔåÆ 400-style error, never a silent clamp), unknown keys drop, absent
- * fields mean absent overrides. Pure ÔÇö no fs.
+ * → 400-style error, never a silent clamp), unknown keys drop, absent
+ * fields mean absent overrides. Pure — no fs.
  */
 
 import assert from "node:assert/strict";
@@ -78,7 +78,7 @@ describe("parseAgentSettingsBody", () => {
 		assert.equal(parseAgentSettingsBody({ tools: { quiz: "no" } }).ok, false);
 		assert.equal(parseAgentSettingsBody({ prompts: { "x.md": 1 } }).ok, false);
 		// switch validity (segment membership, file presence) is the ROUTE's
-		// cross-validation ÔÇö the parser only sees shapes.
+		// cross-validation — the parser only sees shapes.
 	});
 
 	it("search: recognizes Exa, Firecrawl, and Ollama and rejects unknown engines", () => {
@@ -107,7 +107,7 @@ describe("parseAgentSettingsBody", () => {
 		assert.equal(parseAgentSettingsBody({ search: { engine: 1 } }).ok, false);
 	});
 
-	it("graphTools: strict object subsection, enabled boolean when present ÔÇö wave 7, 2026-09-23", () => {
+	it("graphTools: strict object subsection, enabled boolean when present — wave 7, 2026-09-23", () => {
 		const off = parseAgentSettingsBody({ graphTools: { enabled: false } });
 		assert.ok(off.ok);
 		assert.deepEqual(off.settings.graphTools, { enabled: false });
@@ -147,7 +147,7 @@ describe("parseAppearanceSettingsBody", () => {
 		});
 	});
 
-	it("rejects bad enums, ranges, and colors ÔÇö with specific messages, never clamps", () => {
+	it("rejects bad enums, ranges, and colors — with specific messages, never clamps", () => {
 		const cases: unknown[] = [
 			{ theme: "Sepia!" },
 			{ background: "blue" },
@@ -169,7 +169,7 @@ describe("parseAppearanceSettingsBody", () => {
 		assert.ok(parseAppearanceSettingsBody({ mdRendering: { headingWeight: 100 } }));
 		assert.ok(parseAppearanceSettingsBody({ mdRendering: { headingWeight: 900 } }));
 		assert.ok(parseAppearanceSettingsBody({ background: "#abc" }));
-		// null = "the theme's color" ÔÇö explicit, valid
+		// null = "the theme's color" — explicit, valid
 		assert.ok(parseAppearanceSettingsBody({ background: null, fontFamily: null }));
 	});
 
@@ -177,7 +177,7 @@ describe("parseAppearanceSettingsBody", () => {
 		const ok = parseAppearanceSettingsBody({ theme: "rose-pine-dawn", colors: { warning: "#f0f0f0", error: null } });
 		assert.ok(ok.ok);
 		assert.deepEqual(ok.ok && ok.settings, { theme: "rose-pine-dawn", colors: { warning: "#f0f0f0", error: null } });
-		const badTheme = parseAppearanceSettingsBody({ theme: "Ros├® Pine" });
+		const badTheme = parseAppearanceSettingsBody({ theme: "Rosé Pine" });
 		assert.equal(badTheme.ok, false);
 		assert.match(!badTheme.ok ? badTheme.error : "", /theme must be a theme id/);
 		const unknownColor = parseAppearanceSettingsBody({ colors: { sepia: "#000000" } });
@@ -212,7 +212,7 @@ describe("parseGraphSettingsBody", () => {
 		assert.equal(parseGraphSettingsBody("nope").ok, false);
 	});
 
-	it("rendering (2026-10-06): boolean display switch ÔÇö replace-whole like every sibling", () => {
+	it("rendering (2026-10-06): boolean display switch — replace-whole like every sibling", () => {
 		const off = parseGraphSettingsBody({ enabled: true, rendering: false });
 		assert.ok(off.ok);
 		assert.deepEqual(off.settings, { enabled: true, rendering: false });
@@ -223,11 +223,11 @@ describe("parseGraphSettingsBody", () => {
 		assert.equal(parseGraphSettingsBody({ rendering: "off" }).ok, false, "rendering must be a boolean");
 	});
 
-	it("extractionChunkTokens: whole tokens ÔëÑ the 500 floor (extraction-UX redesign, 2026-09-24)", () => {
+	it("extractionChunkTokens: whole tokens ≥ the 500 floor (extraction-UX redesign, 2026-09-24)", () => {
 		const ok = parseGraphSettingsBody({ enabled: true, extractionChunkTokens: 2048 });
 		assert.ok(ok.ok);
 		assert.deepEqual(ok.settings, { enabled: true, extractionChunkTokens: 2048 });
-		// absent = unset ÔÇö replace-whole keeps the factory default at resolution
+		// absent = unset — replace-whole keeps the factory default at resolution
 		const absent = parseGraphSettingsBody({ enabled: true });
 		assert.ok(absent.ok);
 		assert.deepEqual(absent.settings, { enabled: true });
@@ -245,9 +245,9 @@ describe("parseGraphSettingsBody", () => {
 		assert.equal(parseGraphSettingsBody({ extractionChunkTokens: null }).ok, false);
 	});
 
-	it("the dead wave-6 rungs in a body are ignored ÔÇö the section collapses on write", () => {
-		// Old clients may still send {embedding: true, embeddingModel: ÔÇª};
-		// the parser reads ONLY the master switch ÔÇö the dead keys are not
+	it("the dead wave-6 rungs in a body are ignored — the section collapses on write", () => {
+		// Old clients may still send {embedding: true, embeddingModel: …};
+		// the parser reads ONLY the master switch — the dead keys are not
 		// an error, they are just not part of the section anymore.
 		const r = parseGraphSettingsBody({ enabled: false, clustering: true, labeling: true });
 		assert.ok(r.ok);
@@ -291,7 +291,7 @@ describe("parseCompactionSettingsBody (owner round 14)", () => {
 
 describe("SETTINGS_SECTIONS (the route's section map)", () => {
 	it("maps exactly the eight record sections", () => {
-		// compaction joined (owner round 14): its own section PUT ÔÇö the
+		// compaction joined (owner round 14): its own section PUT — the
 		// threshold is engine behavior, not an agent-section key. The custom
 		// endpoint is NOT a section: it is one more provider in the Keys list,
 		// connected through POST /api/custom-provider.
@@ -303,7 +303,7 @@ describe("SETTINGS_SECTIONS (the route's section map)", () => {
 });
 
 describe("parseModelsSettingsBody (model slots wave, 2026-09-20)", () => {
-	it("parses the three slot tiers ÔÇö model required, level rides (BYOK, owner 2026-09-22)", () => {
+	it("parses the three slot tiers — model required, level rides (BYOK, owner 2026-09-22)", () => {
 		const r = parseModelsSettingsBody({
 			strong: { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } },
 			cheap: { model: { provider: "zai", id: "glm-5.3-flash" }, thinkingLevel: "high" },

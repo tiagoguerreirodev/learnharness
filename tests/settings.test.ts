@@ -1,6 +1,6 @@
 /**
  * Tests for the settings record's core layer (settings-storage wave,
- * 2026-09-19): the delta schema's sanitizer (core/settings.ts) ÔÇö strict
+ * 2026-09-19): the delta schema's sanitizer (core/settings.ts) — strict
  * known-field validation with graceful degradation, unknown-key
  * preservation (forward-compat: a newer record must survive an older
  * app), and the factory defaults. The store/adapter tests live in
@@ -39,7 +39,7 @@ describe("FACTORY_SETTINGS (the compiled factory layer)", () => {
 		assert.equal(a.mdRendering.italicColor, null);
 	});
 
-	it("has NO factory model pin ÔÇö chat defaults and role overrides start absent", () => {
+	it("has NO factory model pin — chat defaults and role overrides start absent", () => {
 		assert.equal("chat" in FACTORY_SETTINGS, false);
 		assert.equal("models" in FACTORY_SETTINGS.agent, false);
 	});
@@ -96,7 +96,7 @@ describe("sanitizeUserSettings", () => {
 		assert.deepEqual(sanitizeUserSettings(record), record);
 	});
 
-	it("null and non-objects ÔåÆ null (first-boot semantics), never throws", () => {
+	it("null and non-objects → null (first-boot semantics), never throws", () => {
 		assert.equal(sanitizeUserSettings(null), null);
 		assert.equal(sanitizeUserSettings("junk"), null);
 		assert.equal(sanitizeUserSettings([1, 2]), null);
@@ -124,7 +124,7 @@ describe("sanitizeUserSettings", () => {
 		assert.deepEqual(out.graph, {});
 
 		// extractionChunkTokens (extraction-UX redesign, 2026-09-24):
-		// clamp-never-reject ÔÇö a finite positive value survives (fractions
+		// clamp-never-reject — a finite positive value survives (fractions
 		// floor), below-floor values clamp UP to the cost floor, junk drops
 		// (the factory default resolves at read time).
 		const budget = sanitizeUserSettings({ version: 1, graph: { enabled: true, extractionChunkTokens: 2048 } });
@@ -132,7 +132,7 @@ describe("sanitizeUserSettings", () => {
 		const fraction = sanitizeUserSettings({ version: 1, graph: { extractionChunkTokens: 1024.9 } });
 		assert.equal(fraction?.graph?.extractionChunkTokens, 1024, "fractions floor to whole tokens");
 		const tiny = sanitizeUserSettings({ version: 1, graph: { extractionChunkTokens: 10 } });
-		assert.equal(tiny?.graph?.extractionChunkTokens, 500, "below the floor clamps UP ÔÇö penny-batches are a cost bug, not a preference");
+		assert.equal(tiny?.graph?.extractionChunkTokens, 500, "below the floor clamps UP — penny-batches are a cost bug, not a preference");
 		for (const junk of [0, -1000, NaN, Infinity, "4096", null, true]) {
 			const dropped = sanitizeUserSettings({ version: 1, graph: { extractionChunkTokens: junk } });
 			assert.equal(dropped?.graph?.extractionChunkTokens, undefined, `junk ${String(junk)} drops`);
@@ -181,7 +181,7 @@ describe("sanitizeUserSettings", () => {
 		assert.deepEqual(out.appearance, { background: "#101010" });
 	});
 
-	it("empty strings/whitespace fontFamily ÔåÆ null (Source Sans 3); wrong-type ÔåÆ null too (the default)", () => {
+	it("empty strings/whitespace fontFamily → null (Source Sans 3); wrong-type → null too (the default)", () => {
 		for (const bad of ["", "   ", 12, { name: "x" }]) {
 			const out = sanitizeUserSettings({ appearance: { fontFamily: bad } });
 			assert.ok(out);
@@ -193,10 +193,10 @@ describe("sanitizeUserSettings", () => {
 		const out = sanitizeUserSettings({
 			agent: {
 				models: {
-					teacher: { thinkingLevel: "low" }, // NOT a background role ÔÇö drops
+					teacher: { thinkingLevel: "low" }, // NOT a background role — drops
 					researcher: { model: { provider: "openrouter", id: "x/y" } },
 					extractor: { model: { provider: 3, id: "x/y" }, thinkingLevel: "high" }, // bad model, keeps thinking
-					auditor: { thinkingLevel: "banana" }, // invalid level ÔåÆ empty override drops
+					auditor: { thinkingLevel: "banana" }, // invalid level → empty override drops
 				},
 			},
 		});
@@ -208,7 +208,7 @@ describe("sanitizeUserSettings", () => {
 		assert.equal("auditor" in models, false);
 	});
 
-	it("search engine pin survives; unknown engine ids drop (auto-detect resumes) ÔÇö search wave, 2026-09-20", () => {
+	it("search engine pin survives; unknown engine ids drop (auto-detect resumes) — search wave, 2026-09-20", () => {
 		const good = sanitizeUserSettings({ version: 1, agent: { search: { engine: "tavily" } } });
 		assert.deepEqual(good?.agent?.search, { engine: "tavily" });
 		const exa = sanitizeUserSettings({ version: 1, agent: { search: { engine: "exa" } } });
@@ -225,7 +225,7 @@ describe("sanitizeUserSettings", () => {
 		assert.equal(notObject?.agent?.search, undefined);
 	});
 
-	it("graphTools subsection: boolean survives; bad shapes drop (default ON resumes) ÔÇö wave 7, 2026-09-23", () => {
+	it("graphTools subsection: boolean survives; bad shapes drop (default ON resumes) — wave 7, 2026-09-23", () => {
 		const on = sanitizeUserSettings({ version: 1, agent: { graphTools: { enabled: true } } });
 		assert.deepEqual(on?.agent?.graphTools, { enabled: true });
 		const off = sanitizeUserSettings({ version: 1, agent: { graphTools: { enabled: false } } });
@@ -256,7 +256,7 @@ describe("sanitizeUserSettings", () => {
 	});
 });
 
-describe("sanitizeUserSettings ÔÇö Fast pins (OpenAI Fast mode, S6/S9)", () => {
+describe("sanitizeUserSettings — Fast pins (OpenAI Fast mode, S6/S9)", () => {
 	const sol = { provider: "chatgpt", id: "gpt-6.1-sol" };
 
 	it("keeps fast: true next to a well-formed model, on slots and role overrides", () => {
