@@ -19,9 +19,12 @@ export function chatGPTStreamError(message: string): string {
 	return "ChatGPT request failed. Check your connection and ChatGPT usage, then retry. No API-key fallback was used.";
 }
 
+/** OpenAI-hosted tools a stream's creator may allow. A payload alone never can. */
+export type ChatGPTHostedTool = "web_search";
+
 /** Restrict the body at the final payload seam, even if caller samplingParams add fields. */
 /** serviceTier is set only by the engine (a live Fast pin), never copied from the raw body. */
-export function chatGPTPayload(raw: unknown, selectedModelId: string, serviceTier?: "priority"): Record<string, unknown> {
+export function chatGPTPayload(raw: unknown, selectedModelId: string, serviceTier?: "priority", hosted: readonly ChatGPTHostedTool[] = []): Record<string, unknown> {
 	const payload = raw as Record<string, unknown>;
 	const out: Record<string, unknown> = { model: selectedModelId, store: false, stream: true, ...(serviceTier ? { service_tier: serviceTier } : {}) };
 	for (const key of ["instructions", "reasoning", "include", "text", "tool_choice", "parallel_tool_calls", "prompt_cache_key"]) {
@@ -30,8 +33,10 @@ export function chatGPTPayload(raw: unknown, selectedModelId: string, serviceTie
 	if (!Array.isArray(payload.input)) throw new Error("ChatGPT requires stateless input history");
 	out.input = payload.input.map((item) => item?.role === "system" ? { ...item, role: "developer" } : item);
 	if (Array.isArray(payload.tools) && payload.tools.length) {
-		if (payload.tools.some((tool) => tool.type !== "function" && tool.type !== "custom")) throw new Error("Unsupported ChatGPT tool capability");
-		out.tools = [{ type: "namespace", name: "learnharness", description: "LearnHarness local learning tools", tools: payload.tools }];
+		const local = payload.tools.filter((tool) => !hosted.includes(tool.type));
+		if (local.some((tool) => tool.type !== "function" && tool.type !== "custom")) throw new Error("Unsupported ChatGPT tool capability");
+		const namespace = { type: "namespace", name: "learnharness", description: "LearnHarness local learning tools", tools: local };
+		out.tools = [...(local.length ? [namespace] : []), ...payload.tools.filter((tool) => hosted.includes(tool.type))];
 	}
 	return out;
 }
@@ -46,7 +51,7 @@ export function chatGPTHistory(context: TranscriptContext, logicalModel: Model<A
 function empty(model: Model<Api>): AssistantMessage {
 	return { role: "assistant", api: model.api, provider: "chatgpt", model: model.id, content: [], stopReason: "error", timestamp: Date.now(), usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } };
 }
-export function chatGPTStream(background: () => boolean, lifecycle?: ChatGPTDispatchLifecycle, serviceTier: () => "priority" | undefined = () => undefined): StreamFunction<Api, SimpleStreamOptions> {
+export function chatGPTStream(background: () => boolean, lifecycle?: ChatGPTDispatchLifecycle, serviceTier: () => "priority" | undefined = () => undefined, hosted?: readonly ChatGPTHostedTool[]): StreamFunction<Api, SimpleStreamOptions> {
 	return (logicalModel, context, options) => {
 		const output = new AssistantMessageEventStream();
 		const purpose = background();
@@ -85,7 +90,7 @@ export function chatGPTStream(background: () => boolean, lifecycle?: ChatGPTDisp
 					},
 					onPayload: async (raw, model) => {
 						const replacement = await options?.onPayload?.(raw, model);
-						const payload = chatGPTPayload(replacement === undefined ? raw : replacement, logicalModel.id, serviceTier());
+						const payload = chatGPTPayload(replacement === undefined ? raw : replacement, logicalModel.id, serviceTier(), hosted);
 						check();
 						capturePreparedBackgroundPayload(payload, logicalModel);
 						return payload;
