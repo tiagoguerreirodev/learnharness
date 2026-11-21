@@ -1,5 +1,16 @@
 import { textPartMessageId, type LhViewMessage, type LhViewPart } from "@/src/core";
 
+export function isSubagentSteer(message: LhViewMessage): boolean {
+	return (message.metadata as { subagentResult?: unknown } | undefined)?.subagentResult != null;
+}
+
+/** Keep the latest learner turn and any live tail fully laid out. Background
+ * deliveries and aborts carry teacher-facing text, not a new learner turn. */
+export function newestLearnerTurnFrom(messages: readonly LhViewMessage[]): number {
+	return messages.findLastIndex((message) => message.role === "user" && !isSubagentSteer(message)
+		&& message.parts.some((part) => part.type === "text" || part.type === "image"));
+}
+
 /** Rendering boundaries only. The canonical grouped view and native history
  * stay intact; a long assistant run must not become one enormous DOM row. */
 export interface TranscriptRow {
