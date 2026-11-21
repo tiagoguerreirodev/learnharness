@@ -7,8 +7,9 @@ import os from "node:os";
 import path from "node:path";
 import { backgroundCaptureDir, backgroundCaptureStream, createBackgroundCapture } from "../src/agent/background-capture.ts";
 import { piModels, piEngineForSpec } from "../src/agent/models.ts";
-import { chatGPTAbortController, chatGPTModels, refreshChatGPTModels } from "../src/agent/chatgpt-bridge.ts";
+import { chatGPTAbortController, chatGPTFastTier, chatGPTModels, refreshChatGPTModels } from "../src/agent/chatgpt-bridge.ts";
 import { chatGPTHistory, chatGPTPayload } from "../src/agent/chatgpt-stream.ts";
+import { openAIWebSearch } from "../src/agent/openai-web-search.ts";
 
 const originalSend = Object.getOwnPropertyDescriptor(process, "send");
 const originalConnected = Object.getOwnPropertyDescriptor(process, "connected");
@@ -18,10 +19,14 @@ const originalKey = process.env.OPENAI_API_KEY;
 let leaseError: string | null = null;
 let requests: { authorization: string | null; body: Record<string, any>; url: string }[] = [];
 let responseEvents: unknown[] = [];
+let responseStatus = 200;
+const fastCatalog = () => [{ id: model.id, name: "Scratch account model", fast: { description: "2x speed, increased usage" } }, { id: "unknown-capabilities", name: "Do not invent capabilities", fast: { description: "1.5x speed" } }];
+let catalogModels: unknown[] = [];
 const ipc = (value: unknown) => (process.emit as (name: string, value: unknown) => boolean)("message", value);
 const model = piModels().getModel("openai", "gpt-5") as Model<"openai-responses">;
 const status = { available: true, pending: false, allowBackgroundUse: false, activeId: "scratch-account", accounts: [{ id: "scratch-account", email: "dummy@example.invalid", registration: "oaiapp_scratch", connected: true, planEnabled: true, background: false }], error: null };
 before(async () => {
+	catalogModels = fastCatalog();
 	process.env.LH_DESKTOP_SERVER = "1"; process.env.LH_DESKTOP_API_SECRET = "d".repeat(64);
 	assert(model);
 	process.env.OPENAI_API_KEY = "sk-scratch-must-never-be-used";
@@ -29,7 +34,7 @@ before(async () => {
 	Object.defineProperty(process, "send", { configurable: true, value: (message: any, callback?: () => void) => {
 		queueMicrotask(() => {
 			ipc({ channel: "lh:chatgpt", id: message.id, op: message.op,
-				...(message.op === "lease" && leaseError ? { ok: false, error: leaseError, stamp: { epoch: 1, authorityRevision: 1, revision: 1 } } : { ok: true, value: message.op === "lease" ? { accessToken: "scratch-oauth-only", accountId: "scratch-account", epoch: 1, authorityRevision: 1, revision: 1 } : { epoch: 1, authorityRevision: 1, revision: 1, status, accountId: "scratch-account", models: [{ id: model.id, name: "Scratch account model" }, { id: "unknown-capabilities", name: "Do not invent capabilities" }] } }),
+				...(message.op === "lease" && leaseError ? { ok: false, error: leaseError, stamp: { epoch: 1, authorityRevision: 1, revision: 1 } } : { ok: true, value: message.op === "lease" ? { accessToken: "scratch-oauth-only", accountId: "scratch-account", epoch: 1, authorityRevision: 1, revision: 1 } : { epoch: 1, authorityRevision: 1, revision: 1, status, accountId: "scratch-account", models: catalogModels } }),
 			});
 		});
 		callback?.(); return true;
@@ -38,6 +43,7 @@ before(async () => {
 	globalThis.fetch = async (input, init) => {
 		const req = new Request(input, init);
 		requests.push({ authorization: req.headers.get("authorization"), body: JSON.parse(await req.text()), url: req.url });
+		if (responseStatus !== 200) return new Response(JSON.stringify({ error: { message: "secret scratch provider diagnostic" } }), { status: responseStatus, headers: { "content-type": "application/json" } });
 		return new Response(responseEvents.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(""), { headers: { "content-type": "text/event-stream" } });
 	};
 });
@@ -133,9 +139,112 @@ test("consent revocation cancels only applicable background streams and preserve
 	foreground.release(); background.release();
 });
 
+test("Fast tier metadata is kept only for supported catalog models", () => {
+	assert.deepEqual(chatGPTFastTier(model.id), { description: "2x speed, increased usage" });
+	assert.equal(chatGPTFastTier("unknown-capabilities"), undefined);
+});
+
+test("model DTO carries Fast only for ChatGPT-account models that offer it", async () => {
+	const { toModelDto } = await import("../src/server/model-catalog.ts");
+	assert.deepEqual(toModelDto(chatGPTModels()[0]!).fast, { description: "2x speed, increased usage" });
+	assert.equal("fast" in toModelDto(model), false);
+});
+
+const sentBody = async (spec: Parameters<typeof piEngineForSpec>[0]) => {
+	const engine = piEngineForSpec(spec, false);
+	requests = []; responseEvents = [complete()];
+	for await (const _ of engine.streamFn(engine.model, context(), {})) { /* drain */ }
+	assert.equal(requests.length, 1);
+	return requests[0]!.body;
+};
+
+test("a Fast pin sends service_tier priority; a plain pin sends no service_tier", async () => {
+	assert.equal((await sentBody({ provider: "chatgpt", id: model.id, fast: true })).service_tier, "priority");
+	assert.equal("service_tier" in (await sentBody({ provider: "chatgpt", id: model.id })), false);
+});
+
+test("a Fast pin falls back to the standard tier when the catalog stops offering Fast", async () => {
+	catalogModels = [{ id: model.id, name: "Scratch account model" }];
+	try {
+		await refreshChatGPTModels([model]);
+		assert.equal(chatGPTFastTier(model.id), undefined);
+		const body = await sentBody({ provider: "chatgpt", id: model.id, fast: true });
+		assert.equal("service_tier" in body, false);
+		assert.equal(body.model, model.id);
+	} finally { catalogModels = fastCatalog(); await refreshChatGPTModels([model]); }
+});
+
 test("payload sanitizer omits unsupported fields and rejects unsupported hosted tools", () => {
+	assert.equal(chatGPTPayload({ input: [], service_tier: "priority" }, "scratch").service_tier, undefined);
+	assert.equal(chatGPTPayload({ input: [] }, "scratch", "priority").service_tier, "priority");
 	assert.deepEqual(chatGPTPayload({ model: "scratch", input: [], stream: false, store: true, metadata: { test: true }, previous_response_id: "old", background: true }, "scratch"), { model: "scratch", input: [], stream: true, store: false });
 	assert.throws(() => chatGPTPayload({ input: [], tools: [{ type: "tool_search" }] }, "scratch"), /Unsupported/);
+});
+
+test("a hosted tool passes only when the stream's creator allows its type, beside the namespaced local tools", () => {
+	const local = { type: "function", name: "scratch_tool" }, hosted = { type: "web_search" };
+	assert.throws(() => chatGPTPayload({ input: [], tools: [local, hosted] }, "scratch"), /Unsupported/);
+	assert.throws(() => chatGPTPayload({ input: [], tools: [hosted, { type: "tool_search" }] }, "scratch", undefined, ["web_search"]), /Unsupported/);
+	assert.deepEqual(chatGPTPayload({ input: [], tools: [hosted] }, "scratch", undefined, ["web_search"]).tools, [hosted]);
+	assert.deepEqual(chatGPTPayload({ input: [], tools: [hosted, local] }, "scratch", undefined, ["web_search"]).tools, [{ type: "namespace", name: "learnharness", description: "LearnHarness local learning tools", tools: [local] }, hosted]);
+	const prioritySearch = chatGPTPayload({ input: [], tools: [hosted], service_tier: "default" }, "scratch", "priority", ["web_search"]);
+	assert.equal(prioritySearch.service_tier, "priority");
+	assert.deepEqual(prioritySearch.tools, [hosted]);
+});
+
+for (const { provider, authorization } of [{ provider: "chatgpt", authorization: "Bearer scratch-oauth-only" }, { provider: "openai", authorization: "Bearer sk-scratch-must-never-be-used" }] as const) {
+	test(`OpenAI web search on the ${provider} route sends one hosted-search request with that route's credential only`, async () => {
+		requests = [];
+		const output = [{ type: "web_search_call", id: "ws_scratch", status: "completed", action: { type: "search", sources: [{ type: "url", url: "https://example.invalid/" }] } }];
+		responseEvents = [{ type: "response.created", response: { id: "resp_scratch" } }, complete(output)];
+		const used: number[] = [];
+		assert.deepEqual(await openAIWebSearch("scratch query", 3, { model: { provider, id: model.id }, onUsage: (step) => used.push(step.input) }), output);
+		assert.deepEqual(used, [10]);
+		assert.equal(requests.length, 1);
+		assert.equal(requests[0]!.url, "https://api.openai.com/v1/responses");
+		assert.equal(requests[0]!.authorization, authorization);
+		const body = requests[0]!.body;
+		assert.deepEqual(body.tools, [{ type: "web_search" }]);
+		assert.equal(body.tool_choice, "required");
+		assert.ok(body.include.includes("web_search_call.action.sources"));
+		assert.equal(body.reasoning.effort, "low", "a model that cannot turn reasoning off searches at low effort, not the provider default");
+		assert.match(JSON.stringify(body.input), /Search the web for: scratch query.*List the 3 most relevant results/);
+	});
+
+	test(`OpenAI web search on the ${provider} route fails without results or a quoted provider body, and still records a billed call`, async () => {
+		const job = { provider, id: model.id };
+		const secret = "secret scratch provider diagnostic";
+		const used: number[] = [];
+		for (const events of [[{ type: "error", code: "server_error", message: secret }], [{ type: "response.incomplete", response: { status: "incomplete", output: [], incomplete_details: { reason: secret }, usage } }]]) {
+			responseEvents = events;
+			await assert.rejects(openAIWebSearch("q", 3, { model: job, onUsage: (step) => used.push(step.input) }), (error: Error) => !error.message.includes(secret));
+		}
+		assert.deepEqual(used.filter(Boolean), [10], "the incomplete response reported its tokens");
+		requests = [];
+		const stopped = new AbortController();
+		stopped.abort();
+		await assert.rejects(openAIWebSearch("q", 3, { model: job, signal: stopped.signal, onUsage: () => assert.fail("a cancelled call bills nothing") }));
+		for (const other of [{ provider, id: "not-in-any-catalog" }, { provider: "openrouter", id: "openai/gpt-5" }, undefined]) {
+			await assert.rejects(openAIWebSearch("q", 3, { model: other }), /needs a researcher model on an OpenAI API key or ChatGPT connection/);
+		}
+		assert.equal(requests.length, 0);
+	});
+}
+
+test("an OpenAI API-key search cut short at the output limit still returns the pages it had", async () => {
+	const output = [{ type: "web_search_call", id: "ws_scratch", status: "completed", action: { type: "search", sources: [{ type: "url", url: "https://example.invalid/" }] } }];
+	responseEvents = [{ type: "response.incomplete", response: { status: "incomplete", output, incomplete_details: { reason: "max_output_tokens" }, usage } }];
+	assert.deepEqual(await openAIWebSearch("q", 3, { model: { provider: "openai", id: model.id } }), output);
+});
+
+test("an OpenAI API-key search failure is explained from the HTTP status alone", async () => {
+	const job = { provider: "openai", id: model.id };
+	try {
+		for (const [status, cause] of [[400, "OpenAI rejected the request; the researcher's model may not support web search"], [401, "OpenAI rejected the API key"]] as const) {
+			responseStatus = status;
+			await assert.rejects(openAIWebSearch("q", 3, { model: job }), { message: `OpenAI web search request failed (${status}): ${cause}` });
+		}
+	} finally { responseStatus = 200; }
 });
 
 test("native identity/session/cache/fetch and awaited caller observers survive enforcement; terminal outcome exactly once", async () => {

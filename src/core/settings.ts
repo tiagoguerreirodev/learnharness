@@ -67,6 +67,8 @@ export interface RoleModelOverride {
 	model?: { provider: string; id: string };
 	/** The thinking budget swap. */
 	thinkingLevel?: ThinkingLevel;
+	/** OpenAI Fast for the override's own model (kept only with `model`). */
+	fast?: true;
 }
 
 // ─── Model slots (model slots wave, 2026-09-20) ──────────────────────────────
@@ -207,6 +209,8 @@ export interface ModelSlot {
 	model?: { provider: string; id: string };
 	/** Optional thinking level used with this slot's configured model. */
 	thinkingLevel?: ThinkingLevel;
+	/** OpenAI Fast for the slot's own model (kept only with `model`). */
+	fast?: true;
 }
 
 /** The `models` settings section (owner decision 2026-09-20: a dedicated
@@ -363,7 +367,8 @@ export interface AgentSettings {
 	 *  never chooses an engine to make search work. An explicit choice only
 	 *  pins the preference (e.g. when BOTH keys are present); the chosen
 	 *  engine must still have its key, else search is honestly unavailable.
-	 *  Absent + no key = unavailable (no silent fallback, no default). */
+	 *  Absent + no key = unavailable (no silent fallback, no default).
+	 *  "openai" is the one engine that works only as an explicit choice. */
 	search?: { engine?: SearchEngineId };
 	/** Prober graph tools (wave 7, owner ruling 2026-09-23): read-only
 	 *  knowledge-graph views for the prober agent — a session list +
@@ -652,6 +657,7 @@ function sanitizeRoleOverride(raw: unknown): RoleModelOverride | undefined {
 	if (typeof r.thinkingLevel === "string" && THINKING_LEVELS.includes(r.thinkingLevel as ThinkingLevel)) {
 		out.thinkingLevel = r.thinkingLevel as ThinkingLevel;
 	}
+	if (r.fast === true && out.model) out.fast = true;
 	return Object.keys(out).length ? out : undefined;
 }
 

@@ -217,6 +217,8 @@ describe("sanitizeUserSettings", () => {
 		assert.deepEqual(fc?.agent?.search, { engine: "firecrawl" });
 		const ollama = sanitizeUserSettings({ version: 1, agent: { search: { engine: "ollama" } } });
 		assert.deepEqual(ollama?.agent?.search, { engine: "ollama" });
+		const openai = sanitizeUserSettings({ version: 1, agent: { search: { engine: "openai" } } });
+		assert.deepEqual(openai?.agent?.search, { engine: "openai" });
 		const bad = sanitizeUserSettings({ version: 1, agent: { search: { engine: "google" } } });
 		assert.equal(bad?.agent?.search, undefined);
 		const notObject = sanitizeUserSettings({ version: 1, agent: { search: "tavily" } });
@@ -251,5 +253,45 @@ describe("sanitizeUserSettings", () => {
 			"auditor",
 			"sideQuestion",
 		]);
+	});
+});
+
+describe("sanitizeUserSettings — Fast pins (OpenAI Fast mode, S6/S9)", () => {
+	const sol = { provider: "chatgpt", id: "gpt-6.1-sol" };
+
+	it("keeps fast: true next to a well-formed model, on slots and role overrides", () => {
+		const out = sanitizeUserSettings({
+			version: 1,
+			models: { strong: { model: sol, thinkingLevel: "high", fast: true } },
+			agent: { models: { researcher: { model: sol, fast: true } } },
+		});
+		assert.deepEqual(out?.models, { strong: { model: sol, thinkingLevel: "high", fast: true } });
+		assert.deepEqual(out?.agent?.models, { researcher: { model: sol, fast: true } });
+	});
+
+	it("drops fast unless it is exactly true AND a well-formed model is kept", () => {
+		const out = sanitizeUserSettings({
+			version: 1,
+			models: {
+				strong: { model: sol, fast: "true" },
+				cheap: { model: sol, fast: 1 },
+				vision: { model: { provider: "chatgpt" }, thinkingLevel: "low", fast: true },
+			},
+			agent: { models: { researcher: { fast: true }, auditor: { model: sol, fast: false } } },
+		});
+		assert.deepEqual(out?.models, { strong: { model: sol }, cheap: { model: sol }, vision: { thinkingLevel: "low" } });
+		assert.deepEqual(out?.agent?.models, { auditor: { model: sol } });
+	});
+
+	it("a record without fast sanitizes byte-identically (S9)", () => {
+		const record = {
+			version: 1,
+			agent: { models: { researcher: { model: sol, thinkingLevel: "low" } } },
+			models: {
+				strong: { model: sol, thinkingLevel: "high" },
+				cheap: { model: { provider: "openrouter", id: "qwen/qwen3.8-flash" }, cacheRetention: "long" },
+			},
+		};
+		assert.equal(JSON.stringify(sanitizeUserSettings(structuredClone(record))), JSON.stringify(record));
 	});
 });

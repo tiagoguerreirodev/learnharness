@@ -56,7 +56,8 @@ export function PluginModelPicker({ value, onChange, disabled, onError, commandR
 		</ModelPickerPill>
 		{open && !disabled && <MenuShell anchorRef={root} preferredSide="up" testid="plugin-model-menu" onClose={() => { close(); return "closed"; }} menuClass="flex w-[22rem] flex-col rounded-xl border bg-card p-2 text-xs shadow-xl">
 			{error && <div role="alert" className="text-destructive">{error}</div>}
-			<ModelMenuList models={catalog?.models} effectiveId={value?.id} effectiveProvider={value?.provider} onPick={(model) => {
+			{/* The controlled plugin contract carries only provider/id, not Fast. */}
+			<ModelMenuList models={catalog?.models.map((model) => ({ ...model, fast: undefined }))} effectiveId={value?.id} effectiveProvider={value?.provider} onPick={(model) => {
 				setError(undefined);
 				Promise.resolve().then(() => onChange({ provider: model.provider, id: model.id })).then(close).catch((error: unknown) => {
 					setError(error instanceof Error ? error.message : String(error)); onError?.(error);

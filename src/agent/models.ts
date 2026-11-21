@@ -16,7 +16,7 @@ import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { type ModelRole } from "../../config.ts";
 import { DEFAULT_THINKING_ORDER } from "../core/settings.ts";
 import packageMetadata from "../../package.json" with { type: "json" };
-import { chatGPTModel } from "./chatgpt-bridge.ts";
+import { chatGPTFastTier, chatGPTModel } from "./chatgpt-bridge.ts";
 import { chatGPTStream } from "./chatgpt-stream.ts";
 import type { ChatGPTDispatchLifecycle } from "./chatgpt-request-cycle.ts";
 import { createClaudeCodeProvider } from "./claude-code/provider.ts";
@@ -136,6 +136,9 @@ export interface ResolvedModelSpec {
 	provider: string;
 	id: string;
 	thinkingLevel?: ThinkingLevel;
+	/** ChatGPT-account Fast (service_tier "priority"); dropped per request
+	 *  when the live catalog no longer offers it. */
+	fast?: true;
 }
 
 /** The first entry of the baked default order the model supports (owner,
@@ -204,7 +207,7 @@ export function piEngineForSpec(spec: ResolvedModelSpec, background: boolean | (
 				return current.streamSimple(permitImages(currentModel), context, { ...requestOptions, reasoning: currentLevel === "off" ? undefined : currentLevel });
 			}
 			const purpose = typeof background === "function" ? background : () => background;
-			const stream = spec.provider === "chatgpt" ? chatGPTStream(purpose, lifecycle) : nativeId ? nativeSubscriptionStream(models.getProvider(nativeId)!, purpose, lifecycle) : models.streamSimple.bind(models);
+			const stream = spec.provider === "chatgpt" ? chatGPTStream(purpose, lifecycle, () => (spec.fast && chatGPTFastTier(spec.id) ? "priority" : undefined)) : nativeId ? nativeSubscriptionStream(models.getProvider(nativeId)!, purpose, lifecycle) : models.streamSimple.bind(models);
 			// Direct Anthropic auth is resolved per request. Keep full replay: Pi's
 			// message-thread fingerprint does not include that rotating credential.
 			const wireModel = requestModel.provider === "anthropic" && requestModel.api === "anthropic-messages"
