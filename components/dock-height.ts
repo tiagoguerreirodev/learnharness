@@ -30,14 +30,19 @@ export interface DockHeightMeasurements {
  *  "Your thinking" included, in stacked and two-column cards alike. */
 export const MIN_VISIBLE_LINES = 3;
 
-export function dockHeightBudget(m: DockHeightMeasurements) {
+/** A question pinned open while scrolled up (owner, 2026-10-30) caps its
+ *  question area at this share of the column, leaving the transcript room. */
+const PINNED_QUESTION_SHARE = 0.25;
+
+export function dockHeightBudget(m: DockHeightMeasurements, pinned = false) {
 	const available = Math.max(m.columnHeight - 32, 0);
 	const viewportMaxHeight = Math.max(available - m.outsideHeight, 0);
 	const shellMaxHeight = Math.max(viewportMaxHeight - m.beforeShellHeight, 0);
 	const naturalHeight = m.beforeShellHeight + m.shellBorderHeight + m.contentHeight;
-	const questionMaxHeight = m.questionHeight === null
+	const fit = m.questionHeight === null
 		? null
 		: Math.max(viewportMaxHeight - (naturalHeight - m.questionHeight), 0);
+	const questionMaxHeight = fit !== null && pinned ? Math.min(fit, Math.round(m.columnHeight * PINNED_QUESTION_SHARE)) : fit;
 	// A cap that would clip the question down to less than a usable content
 	// viewport (its padding plus about three lines) is useless: deliberately
 	// uncap the question and scroll the whole content instead. A question
@@ -115,7 +120,7 @@ export const DOCK_HEIGHT_REGION = "[data-dock-height-region], [data-dock-scroll-
  * animated height out of both ancestor measurements, then substitute its
  * natural content and borders. This stays valid during a WAAPI height morph
  * and when the outer viewport is already capped. */
-export function syncDockHeight(elements: DockHeightElements, expanded: boolean) {
+export function syncDockHeight(elements: DockHeightElements, expanded: boolean, pinned = false) {
 	const { column, block, viewport, body, shell, content } = elements;
 	// QuestionDock keeps a laid-out form in an invisible h-0 wrapper;
 	// PracticeDock removes its form. Neither hidden form is a height input.
@@ -132,9 +137,15 @@ export function syncDockHeight(elements: DockHeightElements, expanded: boolean) 
 		questionPaddingHeight: question ? regionChrome(question) : 0,
 		questionMinContentHeight: question ? minContentHeight(question) : 0,
 		...(question ? { questionNaturalHeight: naturalRegionHeight(question, height(question)) } : {}),
-	});
+	}, pinned);
 	if (budget.questionMaxHeight === null) block.style.removeProperty("--dock-max-h");
 	else block.style.setProperty("--dock-max-h", budget.scrollWholeContent ? "none" : `${budget.questionMaxHeight}px`);
+	// The pinned cap can hide options: fade the edge (globals.css) while an
+	// area overflows. Two columns: each column's scroller, never the grid row.
+	if (question) {
+		const areas = question.matches(SCROLL_AREA) ? [question] : [...question.querySelectorAll<HTMLElement>(SCROLL_AREA)];
+		for (const area of areas) area.toggleAttribute("data-dock-fade", pinned && area.scrollHeight > area.clientHeight + 1);
+	}
 	viewport.style.maxHeight = `${budget.viewportMaxHeight}px`;
 	// Overflow is visible in normal layouts: keep the shell's shadow intact.
 	// The stats/model toolbar is a sibling, never inside this overflow box.
@@ -156,9 +167,11 @@ interface DockHeightRefs {
 
 export function useDockHeight({
 	scrollRef, blockRef, viewportRef, bodyRef, shellRef, contentRef,
-	expanded, enabled, mode, onScrollbarInset, onHeight, onLayout,
+	expanded, pinned, enabled, mode, onScrollbarInset, onHeight, onLayout,
 }: DockHeightRefs & {
 	expanded: boolean;
+	/** Opened in place while scrolled up — caps the question area (dockHeightBudget). */
+	pinned: boolean;
 	enabled: boolean;
 	/** Reconnect observers when the keyed content node/scroll area changes. */
 	mode: string;
@@ -177,7 +190,7 @@ export function useDockHeight({
 		const content = contentRef.current;
 		if (!column || !block || !viewport || !body || !shell || !content) return;
 		onScrollbarInset(Math.round((column.offsetWidth - column.clientWidth) / 2));
-		if (enabled) syncDockHeight({ column, block, viewport, body, shell, content }, expanded);
+		if (enabled) syncDockHeight({ column, block, viewport, body, shell, content }, expanded, pinned);
 		else {
 			block.style.removeProperty("--dock-max-h");
 			viewport.style.removeProperty("max-height");
@@ -189,7 +202,7 @@ export function useDockHeight({
 		// did not rerender DockOverlay. Keep its transcript reserve current,
 		// but never report a mid-morph height.
 		if (shell.getAnimations().length === 0) onHeight(block.getBoundingClientRect().height);
-	}, [scrollRef, blockRef, viewportRef, bodyRef, shellRef, contentRef, expanded, enabled, onScrollbarInset, onHeight, onLayout]);
+	}, [scrollRef, blockRef, viewportRef, bodyRef, shellRef, contentRef, expanded, pinned, enabled, onScrollbarInset, onHeight, onLayout]);
 
 	// Imperative constraints land before the overlay's later layout effect
 	// measures its morph target/reserve, and before paint (including reveal).

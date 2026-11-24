@@ -2302,7 +2302,8 @@ export function Chat({
  * is open (a shrinking tail would reintroduce the clamp).
  *
  * Collapse: scroll up past COLLAPSE_DIST and the dock folds into a slim bar;
- * click it (or scroll back to the bottom) to re-expand. The question form
+ * click it to re-expand in place (pinned open until answered), or scroll
+ * back to the bottom. The question form
  * stays MOUNTED while collapsed (hidden, not unmounted) so a half-made
  * selection survives.
  */
@@ -2410,6 +2411,16 @@ function TranscriptElementReporter({ onElement }: { onElement: (element: HTMLEle
 		return () => { window.clearInterval(id); onElement(null); };
 	}, [scrollRef, onElement]);
 	return null;
+}
+
+/**
+ * The scroll fold's rule (intent-gated, owner 2026-10-05) plus the PIN
+ * (owner, 2026-10-27): a question opened while scrolled up opens in place
+ * and never folds until answered — the learner reads history beside it.
+ * Pure for tests.
+ */
+export function shouldFold(d: number, s: { intent: boolean; atBottom: boolean; pinned: boolean }): boolean {
+	return d > COLLAPSE_DIST && !s.intent && !s.atBottom && !s.pinned;
 }
 
 /** Host-only composition/test seam; never part of the plugin SDK. */
@@ -2562,9 +2573,12 @@ export function DockOverlay({
 	// measures the bar, the reserve keeps the composer's height, and the
 	// only motion is the teaching text itself.
 	const prevPendingIdRef = useRef(pendingId);
+	// Set by an in-place open while scrolled up; the next question starts unpinned.
+	const pinnedRef = useRef(false);
 	if (pendingId !== prevPendingIdRef.current) {
 		const wasQuestion = prevPendingIdRef.current !== null;
 		prevPendingIdRef.current = pendingId;
+		pinnedRef.current = false;
 		if (pendingId && requiresReveal) {
 			const arrival = revealArrival(wasQuestion);
 			setExpanded(arrival.expanded);
@@ -2749,7 +2763,7 @@ export function DockOverlay({
 		scrollRef, blockRef, viewportRef, bodyRef, shellRef, contentRef,
 		// The two-column row replaces the question scroll area as the
 		// height-variable region: reconnect the observers when it swaps.
-		expanded, enabled: ownsDock, mode: `${mode}:${questionLayout?.kind ?? "default"}`, onScrollbarInset: setSbInset, onHeight: offerSettled,
+		expanded, pinned: pinnedRef.current, enabled: ownsDock, mode: `${mode}:${questionLayout?.kind ?? "default"}`, onScrollbarInset: setSbInset, onHeight: offerSettled,
 		onLayout: retargetOpening,
 	});
 
@@ -2817,6 +2831,12 @@ export function DockOverlay({
 	const expandAndReveal = () => {
 		setRevealed(true); // the teach-check invitation was accepted (W5)
 		setExpanded(true);
+		// Scrolled up (owner, 2026-10-27): open in place, no jump to the
+		// bottom, and pin it open until answered (shouldFold).
+		if (!atBottomRef.current) {
+			pinnedRef.current = true;
+			return;
+		}
 		void suppressFoldDuringReveal();
 	};
 	const expandAndRevealRef = useRef(expandAndReveal);
@@ -2872,7 +2892,8 @@ export function DockOverlay({
 				// folded on stick-to-bottom's catch-up transients; a real fold
 				// needs the distance AND stick-to-bottom agreeing the learner
 				// left the bottom.
-				if (d > COLLAPSE_DIST && !expandIntentRef.current && !atBottomRef.current) setExpanded(false);
+				if (shouldFold(d, { intent: expandIntentRef.current, atBottom: atBottomRef.current, pinned: pinnedRef.current }))
+					setExpanded(false);
 			} else if (d < EXPAND_DIST) {
 				// Teach checks stay collapsed until the learner opens them (W5): the
 				// at-bottom auto-expand would pop the form over the teaching.
