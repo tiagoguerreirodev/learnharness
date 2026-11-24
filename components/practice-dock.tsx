@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { ViewReaderRef } from "./session-view-readers";
 import { ChevronRightIcon } from "lucide-react";
 import { ToolContentResponse } from "@/components/ai-elements/message";
@@ -37,9 +38,10 @@ export interface PracticeDockProps {
 	viewReader?: ViewReaderRef<string>;
 	/** The active problem's tool-call id (submissions target it). */
 	problemCallId: string;
-	/** The pose's arguments — only the statement is the learner's (the
-	 *  mode badge would edge toward announcing the target; dropped). */
-	input: { statement: string };
+	/** The pose's arguments — only the statement and the reference sheet
+	 *  are the learner's (the mode badge would edge toward announcing the
+	 *  target; dropped). A reference string opens the fullscreen worksheet. */
+	input: { statement: string; reference?: string };
 	/** Collapse state, owned by the DockOverlay. */
 	expanded: boolean;
 	onExpand: () => void;
@@ -69,6 +71,15 @@ export function PracticeDock({ viewReader, problemCallId, input, expanded, onExp
 	const controller = useOptionalInteractionLayers();
 	const rootRef = useRef<HTMLElement>(null);
 	const [nativeThinking, setNativeThinking] = useState("");
+	// A pose carrying a reference sheet IS a worksheet: it opens fullscreen
+	// at once (the issue's word), and the Close button drops back here.
+	const hasRef = typeof input.reference === "string" && input.reference.trim() !== "";
+	const [full, setFull] = useState(hasRef);
+	// The overlay PORTALS after mount: the dock's shell clips and, while its
+	// variant animation runs, transforms — a fixed child would ride inside it.
+	// Server render (and the first hydration frame) keeps it inline.
+	const [mounted, setMounted] = useState(false);
+	useEffect(() => setMounted(true), []);
 	const custom = useRef(customInput); custom.current = customInput;
 	const thinking = customInput ? customInput.thinking : nativeThinking;
 	const setThinking = (value: string) => { if (custom.current) custom.current.onThinkingChange(value); else setNativeThinking(value); };
@@ -121,6 +132,118 @@ export function PracticeDock({ viewReader, problemCallId, input, expanded, onExp
 	 * while the dock is — collapsed bar included (the trace survives). */
 	useEnterSubmits(submit, rootRef);
 
+	/* The learner's half, identical in the dock and the worksheet: Enter
+	   SENDS (owner round 2, 2026-10-05); Shift+Enter makes a newline. */
+	const thinkingField = (
+		<div
+			data-testid="practice-thinking-field"
+			className="m-1.5 rounded-[10px] border border-border/70 bg-background/60 transition-colors focus-within:border-primary/50"
+		>
+			<div className="px-2.5 pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+				YOUR THINKING
+			</div>
+			<PathInput
+				value={thinking}
+				onValueChange={(value) => {
+					thinkingRef.current = value; editRevision.current++;
+					setThinking(value);
+				}}
+				onKeyDown={(e) => {
+					if (!isInteractionScopeEligible(e.currentTarget, controller)) return;
+					// Esc ends dictation — stopPropagation claims it (the
+					// keyboard machine) so the window chain doesn't also fire.
+					if (e.key === "Escape" && onEscape) {
+						controller?.claimEscape(e);
+						e.preventDefault();
+						e.stopPropagation();
+						onEscape();
+						return;
+					}
+					// Enter SENDS — the single lane (owner round 2, 2026-10-05);
+					// Shift+Enter is the newline, ⌘/Ctrl+Enter the chord too.
+					if (e.key === "Enter" && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
+						e.preventDefault();
+						submit();
+					}
+				}}
+				placeholder="Work here, think out loud."
+				className={cn(
+					"field-sizing-content lh-input max-h-64 min-h-16 w-full resize-none bg-transparent px-2.5 pb-2 outline-none placeholder:text-muted-foreground",
+				)}
+			/>
+			{/* The submit row (owner round 4, 2026-10-05): IDENTICAL to the
+			    question dock's — hint left, the SAME Button (h-9, px-3.5),
+			    one p-1 row. Corner radii concentric: shell 16 − m-1.5 (6) =
+			    field 10 − p-1 (4) = button 6. */}
+			<div className="flex items-center justify-between gap-2 p-1">
+				<span aria-hidden className="pl-1.5 text-xs text-muted-foreground">
+					{compactionRunning ? "compacting session…" : "↵ submits · ⇧↵ newline"}
+				</span>
+				<Button
+					type="button"
+					data-testid="practice-send"
+					disabled={(customInput ? !customInput.ready : (!thinking.trim() && !hasPendingInput)) || compactionRunning || preparing}
+					onClick={() => submit()}
+					className="ml-auto h-9 rounded-[6px] px-3.5 text-sm font-medium"
+				>
+					{customInput ? "Submit" : "Submit thinking"}
+				</Button>
+			</div>
+		</div>
+	);
+
+	/* The agent's half: the 'Problem' eyebrow (mirroring the quiz cards' label
+	   row — owner round, 2026-10-05) + the statement, markdown + LaTeX
+	   rendered. The dock caps the column with --dock-max-h (the old fixed
+	   40vh cut long problems short); the worksheet takes the whole pane. */
+	const statement = (className: string) => (
+		<div data-dock-scroll-area="" className={cn("overflow-y-auto px-4 pt-3 pb-2", className)}>
+			<div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Problem</div>
+			<div className="lh-prose text-[15px]">
+				<ToolContentResponse>{input.statement}</ToolContentResponse>
+			</div>
+		</div>
+	);
+
+	/* ── the fullscreen worksheet ── */
+	if (expanded && full && hasRef) {
+		const worksheet = (
+			<div ref={element => { rootRef.current = element; }} data-testid="worksheet-full" data-problem={problemCallId} className="fixed inset-0 z-50 flex flex-col bg-background">
+				<div className="flex items-center justify-between border-b px-4 py-2">
+					<div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Worksheet</div>
+					<Button
+						type="button"
+						variant="ghost"
+						data-testid="worksheet-close"
+						onClick={() => setFull(false)}
+						className="h-9 rounded-[6px] px-3.5 text-sm font-medium"
+					>
+						Close
+					</Button>
+				</div>
+				<div className="grid min-h-0 flex-1 md:grid-cols-[1fr_minmax(0,22rem)]">
+					{/* Exercises left, the field under them; the reference scrolls
+					    alone on its own side (stacked below it under md). */}
+					<div className="flex min-h-0 flex-col">
+						{statement("min-h-0 flex-1")}
+						{customInput?.editor}
+						{thinkingField}
+					</div>
+					<aside
+						data-testid="worksheet-reference"
+						className="overflow-y-auto border-t p-4 md:border-t-0 md:border-l"
+					>
+						<div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Reference</div>
+						<div className="lh-prose text-[15px]">
+							<ToolContentResponse>{input.reference}</ToolContentResponse>
+						</div>
+					</aside>
+				</div>
+			</div>
+		);
+		return mounted ? createPortal(worksheet, document.body) : worksheet;
+	}
+
 	/* ── the collapsed bar ── */
 	const bar = (
 			<button
@@ -142,76 +265,25 @@ export function PracticeDock({ viewReader, problemCallId, input, expanded, onExp
 		<div ref={element => { rootRef.current = element; }} data-testid="practice-dock" data-problem={problemCallId}>
 			{!expanded && bar}
 			<div hidden={!expanded}>
-			{/* The agent's half: the 'Problem' eyebrow (mirroring the quiz
-			    cards' label row — owner round, 2026-10-05) + the statement,
-			    markdown + LaTeX rendered, capped by the measured column
-			    (--dock-max-h; the old fixed 40vh cut long problems short). */}
-			<div data-dock-scroll-area="" className="max-h-[var(--dock-max-h,40vh)] overflow-y-auto px-4 pt-3 pb-2">
-				<div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Problem</div>
-				<div className="lh-prose text-[15px]">
-					<ToolContentResponse>{input.statement}</ToolContentResponse>
-				</div>
-			</div>
+			{statement("max-h-[var(--dock-max-h,40vh)]")}
 
 			{customInput?.editor}
 
-			{/* The learner's half: Enter SENDS (owner round 2, 2026-10-05);
-			    Shift+Enter makes a newline — less to decide about. */}
-			<div
-				data-testid="practice-thinking-field"
-				className="m-1.5 rounded-[10px] border border-border/70 bg-background/60 transition-colors focus-within:border-primary/50"
-			>
-				<div className="px-2.5 pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-					YOUR THINKING
-				</div>
-				<PathInput
-					value={thinking}
-					onValueChange={(value) => {
-						thinkingRef.current = value; editRevision.current++;
-						setThinking(value);
-					}}
-					onKeyDown={(e) => {
-						if (!isInteractionScopeEligible(e.currentTarget, controller)) return;
-						// Esc ends dictation — stopPropagation claims it (the
-						// keyboard machine) so the window chain doesn't also fire.
-						if (e.key === "Escape" && onEscape) {
-							controller?.claimEscape(e);
-							e.preventDefault();
-							e.stopPropagation();
-							onEscape();
-							return;
-						}
-						// Enter SENDS — the single lane (owner round 2, 2026-10-05);
-						// Shift+Enter is the newline, ⌘/Ctrl+Enter the chord too.
-						if (e.key === "Enter" && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
-							e.preventDefault();
-							submit();
-						}
-					}}
-					placeholder="Work here, think out loud."
-					className={cn(
-						"field-sizing-content lh-input max-h-64 min-h-16 w-full resize-none bg-transparent px-2.5 pb-2 outline-none placeholder:text-muted-foreground",
-					)}
-				/>
-				{/* The submit row (owner round 4, 2026-10-05): IDENTICAL to the
-				    question dock's — hint left, the SAME Button (h-9, px-3.5),
-				    one p-1 row. Corner radii concentric: shell 16 − m-1.5 (6) =
-				    field 10 − p-1 (4) = button 6. */}
-				<div className="flex items-center justify-between gap-2 p-1">
-					<span aria-hidden className="pl-1.5 text-xs text-muted-foreground">
-						{compactionRunning ? "compacting session…" : "↵ submits · ⇧↵ newline"}
-					</span>
+			{hasRef && (
+				<div className="px-4 pb-2">
 					<Button
 						type="button"
-						data-testid="practice-send"
-						disabled={(customInput ? !customInput.ready : (!thinking.trim() && !hasPendingInput)) || compactionRunning || preparing}
-						onClick={() => submit()}
-						className="ml-auto h-9 rounded-[6px] px-3.5 text-sm font-medium"
+						variant="outline"
+						data-testid="worksheet-open"
+						onClick={() => setFull(true)}
+						className="h-9 rounded-[6px] px-3.5 text-sm font-medium"
 					>
-						{customInput ? "Submit" : "Submit thinking"}
+						Open worksheet
 					</Button>
 				</div>
-			</div>
+			)}
+
+			{thinkingField}
 			</div>
 		</div>
 	);

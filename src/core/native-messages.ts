@@ -502,7 +502,7 @@ export function modelSolutionForConclude(
 export function problemInputForConclude(
 	messages: readonly LhMessage[],
 	concludeCallId: string,
-): { statement?: unknown; mode?: unknown; target?: unknown; modelSolution?: unknown } | undefined {
+): { statement?: unknown; mode?: unknown; target?: unknown; modelSolution?: unknown; reference?: unknown } | undefined {
 	let mi = messages.findIndex(
 		(m) =>
 			(m as { role?: string }).role === "assistant" &&
@@ -526,7 +526,7 @@ export function problemInputForConclude(
 			const problem = practiceProblemForCall(messages, { messageId: m.id, contentIndex: bi, toolCallId: block.id, toolName: block.name });
 			if (!problem) continue;
 			return (problem.input ?? undefined) as
-				| { statement?: unknown; mode?: unknown; target?: unknown; modelSolution?: unknown }
+				| { statement?: unknown; mode?: unknown; target?: unknown; modelSolution?: unknown; reference?: unknown }
 				| undefined;
 		}
 	}
