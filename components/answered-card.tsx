@@ -11,7 +11,8 @@ import { PathText } from "@/components/file-path-chip";
 import { cn } from "@/lib/utils";
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import type { QuestionAnswerData } from "@/src/core";
-import { answeredOptionLetters, answerForPresentation, parseAskInput, parseQuizInput } from "@/src/core";
+import { answeredOptionLetters, answerForPresentation, parseAskInput, parseExplainInput, parseQuizInput } from "@/src/core";
+import { QuestionFigure } from "@/components/question-figure";
 import { useAppearance } from "@/components/settings/appearance";
 import { questionCardLabel, questionCardStandIn } from "@/components/question-dock";
 import {
@@ -144,6 +145,8 @@ export function AnsweredCard({ answer: savedAnswer, input, toolCallId, stateKey 
 	// any parse failure or absent input renders exactly the older card.
 	const askInput = answer.kind === "ask" ? parseAskInput(input) : undefined;
 	const parsedDetails = askInput?.details ?? (answer.kind === "quiz" ? parseQuizInput(input)?.details : undefined);
+	// The question's figure rides the original call too (owner, 2026-10-27).
+	const figure = answer.kind === "quiz" ? parseQuizInput(input)?.figure : answer.kind === "explain" ? parseExplainInput(input)?.figure : undefined;
 	const descByIndex = new Map((askInput?.options ?? []).map((o, i) => [i + 1, o.description]));
 
 	return (
@@ -186,6 +189,7 @@ export function AnsweredCard({ answer: savedAnswer, input, toolCallId, stateKey 
 						<StatusBadge text="incorrect" color="var(--lh-error)" />
 					))}
 			</div>
+			<QuestionFigure figure={figure} />
 			<div ref={questionTextRef} className="mb-3 font-medium">
 				<ToolContentResponse>{answer.questionText}</ToolContentResponse>
 			</div>

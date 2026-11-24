@@ -841,3 +841,37 @@ describe("question context renders as markdown everywhere (owner, 2026-10-12)", 
 		assert.ok(!html.includes("lh-prose block text-xs"), "no description slot without an ask input");
 	});
 });
+
+describe("question figures in the question column (owner, 2026-10-27; placement 2026-11-24)", () => {
+	const figure = "<svg xmlns='http://www.w3.org/2000/svg' width='120' height='80'><rect width='120' height='80' fill='white'/></svg>";
+
+	it("dock: label, then figure, then question, then options in DOM order; no figure, nothing rendered", () => {
+		const html = renderDock({ toolName: "quiz", toolCallId: "f1", input: { ...quizInput, figure } as never });
+		assert.match(html, /data-testid="question-figure"/);
+		const at = html.indexOf('data-testid="visual-card"');
+		assert.ok(at > 0, "the figure renders through VisualOutputCard");
+		assert.ok(html.indexOf("Check") < at, "the label precedes the figure");
+		assert.ok(at < html.indexOf("Which planet"), "the figure precedes the question");
+		assert.ok(at < html.indexOf('role="radiogroup"'), "figure precedes the options");
+		assert.ok(!renderDock({ toolName: "quiz", toolCallId: "f2", input: quizInput as never }).includes("question-figure"));
+	});
+
+	it("explain dock carries it too", () => {
+		const html = renderDock({ toolName: "recall", toolCallId: "f3", input: { question: "Describe the curve.", correctAnswer: "A parabola.", figure } as never });
+		assert.match(html, /data-testid="visual-card"/);
+	});
+
+	it("answered cards re-render the figure from the persisted call", () => {
+		const quiz = buildAnswer(quizQD(), { values: ["Mercury"] });
+		assert.match(renderToStaticMarkup(<AnsweredCard answer={quiz} input={{ ...quizInput, figure }} />), /data-testid="visual-card"/);
+		const card = renderToStaticMarkup(<AnsweredCard answer={quiz} input={{ ...quizInput, figure }} />);
+		assert.ok(card.indexOf('data-testid="question-figure"') < card.indexOf("Which planet"), "the figure precedes the question text");
+		assert.ok(!renderToStaticMarkup(<AnsweredCard answer={quiz} input={quizInput} />).includes("question-figure"));
+		const explainQD: QuestionData = { id: "f4", kind: "explain", question: "Describe the curve.", mode: "text", options: [], committedAnswer: "A parabola.", createdAt: new Date().toISOString() };
+		const explain = buildAnswer(explainQD, { text: "A U shape." });
+		assert.match(
+			renderToStaticMarkup(<AnsweredCard answer={explain} input={{ question: "Describe the curve.", correctAnswer: "A parabola.", figure }} />),
+			/data-testid="visual-card"/,
+		);
+	});
+});

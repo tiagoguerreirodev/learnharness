@@ -12,6 +12,7 @@ import { PathInput, pathInputClassName } from "@/components/path-input";
 import { MalformedQuestion } from "@/components/malformed-question";
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { QuestionPreview } from "@/components/question-preview";
+import { QuestionFigure } from "@/components/question-figure";
 import { cn } from "@/lib/utils";
 import {
 	buildAnswer,
@@ -897,6 +898,7 @@ function QuestionDockForm({
 				{questionCardLabel(toolName, kind, qd.questionType)}
 				{qd.mode === "multi-select" && " · select all that apply"}
 			</div>
+			<QuestionFigure figure={(input as { figure?: unknown }).figure} />
 			<div className={QC_QUESTION}>
 				<ToolContentResponse>{qd.question}</ToolContentResponse>
 			</div>
