@@ -28,7 +28,7 @@ import type {
 	ModelSlot,
 	RoleModelOverride,
 } from "../core/settings.ts";
-import { BACKGROUND_MODEL_ROLES, CACHE_RETENTIONS, COMPACTION_THRESHOLD_FLOOR, CUSTOM_MODEL_PIN_FLOOR, EXTRACTION_CHUNK_TOKENS_FLOOR, isTranscriptMaxWidth, MODEL_SLOTS, TRANSCRIPT_WIDTH_MAX_REM, TRANSCRIPT_WIDTH_MIN_REM } from "../core/settings.ts";
+import { BACKGROUND_MODEL_ROLES, CACHE_RETENTIONS, COMPACTION_THRESHOLD_FLOOR, CUSTOM_MODEL_PIN_FLOOR, EXTRACTION_CHUNK_TOKENS_FLOOR, isTextWidth, isTranscriptMaxWidth, MODEL_SLOTS, TEXT_WIDTHS, TRANSCRIPT_WIDTH_MAX_REM, TRANSCRIPT_WIDTH_MIN_REM } from "../core/settings.ts";
 import { WRITABLE_TOOL_KEYS } from "../core/pending.ts";
 import { isSearchEngineId, SEARCH_ENGINES } from "../core/search.ts";
 import { isDictationLanguage } from "../core/dictation.ts";
@@ -251,7 +251,8 @@ function parseHexOrNull(value: unknown, field: string): { color?: string | null;
 }
 
 /** appearance: { theme?, background?, colors?, fontFamily?,
- *  proseFontSize?, codeLigatures?, sessionNameSerif?, compactSessionList?, mdRendering? } —
+ *  proseFontSize?, codeLigatures?, sessionNameSerif?, compactSessionList?,
+ *  textWidth?, constrainMedia?, mdRendering? } —
  *  `theme` is shape-checked here (slug); whether it EXISTS is the route's check. */
 export function parseAppearanceSettingsBody(body: unknown): SettingsBodyResult<AppearanceSettings> {
 	const raw = asRecord(body);
@@ -329,6 +330,18 @@ export function parseAppearanceSettingsBody(body: unknown): SettingsBodyResult<A
 			return { ok: false, error: "adaptiveQuestions must be a boolean" };
 		}
 		settings.adaptiveQuestions = raw.adaptiveQuestions;
+	}
+	if (raw.textWidth !== undefined) {
+		if (!isTextWidth(raw.textWidth)) {
+			return { ok: false, error: `textWidth must be one of ${TEXT_WIDTHS.map((w) => `"${w}"`).join(", ")}` };
+		}
+		settings.textWidth = raw.textWidth;
+	}
+	if (raw.constrainMedia !== undefined) {
+		if (typeof raw.constrainMedia !== "boolean") {
+			return { ok: false, error: "constrainMedia must be a boolean" };
+		}
+		settings.constrainMedia = raw.constrainMedia;
 	}
 	if (raw.mdRendering !== undefined) {
 		const md = asRecord(raw.mdRendering);

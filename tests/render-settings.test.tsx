@@ -439,6 +439,33 @@ describe("AppearanceSection (thin SSR)", () => {
 		assert.ok(html.includes("16px"));
 		assert.ok(!html.includes('data-testid="row-mode"'), "the mode row is gone — the theme declares it");
 	});
+
+	it("text width defaults to Full; the media row dims", () => {
+		const html = renderToStaticMarkup(<AppearanceSection appearance={undefined} onSectionChange={() => {}} />);
+		assert.ok(html.includes("Full column"));
+		assert.ok(/<option value="full" selected="">Full<\/option>/.test(html), "Full is the selected option");
+		assert.ok(tagOf(html, "row-constrain-media").includes("opacity-40"), "media row dims under Full");
+	});
+
+	it("text width Large (80rem); media limit is off and live", () => {
+		const html = renderToStaticMarkup(<AppearanceSection appearance={{ textWidth: "xl" }} onSectionChange={() => {}} />);
+		assert.ok(html.includes("80rem"));
+		assert.ok(/<option value="xl" selected="">Large<\/option>/.test(html), "Large is the selected option");
+		for (const label of ["Full", "Large", "Medium", "Small"]) assert.ok(html.includes(`>${label}</option>`), label);
+		assert.ok(!tagOf(html, "row-constrain-media").includes("opacity-40"), "media row live under a measure");
+		assert.ok(tagOf(html, "toggle-limit-media-width").includes(`aria-checked="false"`));
+	});
+
+	it("text width Full: the media row dims and its switch locks", () => {
+		const html = renderToStaticMarkup(
+			<AppearanceSection appearance={{ textWidth: "full", constrainMedia: true }} onSectionChange={() => {}} />,
+		);
+		assert.ok(html.includes("Full column"));
+		assert.ok(tagOf(html, "row-constrain-media").includes("opacity-40"), "whole row dims");
+		const toggle = tagOf(html, "toggle-limit-media-width");
+		assert.ok(toggle.includes("disabled"), "switch locked");
+		assert.ok(toggle.includes(`aria-checked="true"`), "stored value still shows");
+	});
 });
 
 describe("KeyboardSection (thin SSR)", () => {

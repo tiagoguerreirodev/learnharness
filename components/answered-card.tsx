@@ -127,7 +127,7 @@ export function AnsweredCard({ answer: savedAnswer, input, toolCallId, stateKey 
 
 	if (answer.dismissed) {
 		return (
-			<div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
+			<div className="lh-measure rounded-xl border bg-card p-4 text-sm text-muted-foreground">
 				<span className="font-medium">{answer.questionText}</span> — skipped
 			</div>
 		);
@@ -165,7 +165,7 @@ export function AnsweredCard({ answer: savedAnswer, input, toolCallId, stateKey 
 		    the bottom rhythm when a row ends the card. */}
 		<div
 			ref={cardRef}
-			className="rounded-xl border bg-card p-4 text-card-foreground [&>*:last-child]:mb-0"
+			className="lh-measure rounded-xl border bg-card p-4 text-card-foreground [&>*:last-child]:mb-0"
 			data-testid="answered-card"
 			data-question-layout={columns ? "columns" : "stacked"}
 		>

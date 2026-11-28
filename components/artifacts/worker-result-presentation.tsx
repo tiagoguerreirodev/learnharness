@@ -6,11 +6,13 @@ import { Hint } from "@/components/ui/hint";
 
 /** Shared research/PDF completion grammar. The host owns the summary; only
  * the expanded body is replaceable by a plugin renderer. */
-export function WorkerResultDetails({ heading, children, icon = <CheckIcon className="size-3.5" />, testId, headerTestId, headerTooltip, disclosure = "labels", viewLabel = "view brief", hideLabel = "hide brief" }: {
+export function WorkerResultDetails({ heading, children, icon = <CheckIcon className="size-3.5" />, testId, className, headerTestId, headerTooltip, disclosure = "labels", viewLabel = "view brief", hideLabel = "hide brief" }: {
 	heading: ReactNode;
 	children: ReactNode;
 	icon?: ReactNode;
 	testId?: string;
+	/** Extra classes on the <details> (e.g. lh-measure for the chat text width). */
+	className?: string;
 	headerTestId?: string;
 	headerTooltip?: string;
 	/** Native brief labels remain the default; compact results opt into a chevron. */
@@ -31,7 +33,7 @@ export function WorkerResultDetails({ heading, children, icon = <CheckIcon class
 		</summary>
 	);
 	return (
-		<details data-testid={testId} className="group w-full text-xs text-muted-foreground">
+		<details data-testid={testId} className={`group w-full text-xs text-muted-foreground${className ? ` ${className}` : ""}`}>
 			{headerTooltip ? <Hint label={headerTooltip}>{summary}</Hint> : summary}
 			<div className="mt-2">{children}</div>
 		</details>

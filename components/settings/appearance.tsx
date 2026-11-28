@@ -35,6 +35,7 @@ import {
 	BUILTIN_THEMES,
 	effectiveColors,
 	FACTORY_SETTINGS,
+	TEXT_WIDTH_SIZES,
 	resolveTheme,
 	themeVars,
 	type AppearanceSettings,
@@ -57,6 +58,8 @@ export function resolveAppearance(delta: AppearanceSettings | undefined) {
 		compactSessionList: delta?.compactSessionList ?? f.compactSessionList,
 		transcriptMaxWidth: delta?.transcriptMaxWidth ?? f.transcriptMaxWidth,
 		adaptiveQuestions: delta?.adaptiveQuestions ?? f.adaptiveQuestions,
+		textWidth: delta?.textWidth ?? f.textWidth,
+		constrainMedia: delta?.constrainMedia ?? f.constrainMedia,
 		mdRendering: {
 			headingWeight: delta?.mdRendering?.headingWeight ?? f.mdRendering.headingWeight,
 			boldColor: delta?.mdRendering?.boldColor ?? f.mdRendering.boldColor,
@@ -99,6 +102,17 @@ export function appearanceVars(
 	// The session transcript's maximum width (rem). Absent = Full: the
 	// stylesheet's `none` returns, exactly today's full-width column.
 	if (a.transcriptMaxWidth !== null) vars["--lh-transcript-max"] = `${a.transcriptMaxWidth}rem`;
+	// The chat measure: text centers at --lh-text-max. Media nested in a
+	// narrowed text block breaks out to the transcript column (100cqi of the
+	// column's inline-size container) unless media is constrained too.
+	const textMax = TEXT_WIDTH_SIZES[a.textWidth];
+	vars["--lh-text-max"] = textMax;
+	vars["--lh-media-max"] = a.constrainMedia ? textMax : "100%";
+	vars["--lh-media-span"] = a.constrainMedia ? "100%" : "100cqi";
+	vars["--lh-media-outset"] = a.constrainMedia ? "0px" : "calc(50% - 50cqi)";
+	// Broken-out tables hug their cells, so they center on the text's axis;
+	// inside the text they stay left-aligned with it.
+	vars["--lh-media-table-inset"] = a.constrainMedia || a.textWidth === "full" ? "0px" : "auto";
 	// Markdown heading weight (the emphasis inks ride the theme colors).
 	vars["--lh-heading-weight"] = String(a.mdRendering.headingWeight);
 	return vars;

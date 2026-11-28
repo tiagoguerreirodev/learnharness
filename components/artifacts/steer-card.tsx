@@ -49,7 +49,7 @@ export function SubagentSteerCard({ message }: { message: LhViewMessage }) {
 		);
 		if (aborted?.data) return <AbortedBadge kind={aborted.data.kind ?? "job"} />;
 		return (
-				<div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
+				<div className="lh-measure rounded-xl border bg-card p-4 text-sm text-muted-foreground">
 				A sub-agent finished, but its result could not be displayed.
 			</div>
 		);
@@ -83,7 +83,7 @@ export function SubagentSteerCard({ message }: { message: LhViewMessage }) {
  * this just marks what happened. */
 function AbortedBadge({ kind }: { kind: string }) {
 	return (
-		<div data-testid="job-aborted-badge" className="flex items-center gap-2 text-xs text-muted-foreground">
+		<div data-testid="job-aborted-badge" className="lh-measure flex items-center gap-2 text-xs text-muted-foreground">
 			<CircleX className="size-3.5" />
 			<span className="font-medium uppercase tracking-wide">{kind}</span>
 			<span>aborted by the learner</span>
@@ -100,7 +100,7 @@ function PdfCompleteBadge({ result }: { result: PdfResult }) {
 	// the ?? is runtime tolerance for pre-split persisted steers.
 	const readPages = result.pagesRead ?? result.pagesConsulted;
 	return (
-		<WorkerResultDetails testId="pdf-complete-badge" heading={<>
+		<WorkerResultDetails testId="pdf-complete-badge" className="lh-measure" heading={<>
 				<span className="font-medium uppercase tracking-wide">PDF</span>
 				<span>reading complete</span>
 				{readPages.length > 0 && (
@@ -121,7 +121,7 @@ function PdfCompleteBadge({ result }: { result: PdfResult }) {
  * the artifact part in the record is the single source of truth. */
 function ResearchCompleteBadge({ result }: { result: ResearchResult }) {
 	return (
-		<WorkerResultDetails testId="research-complete-badge" heading={<>
+		<WorkerResultDetails testId="research-complete-badge" className="lh-measure" heading={<>
 				<span className="font-medium uppercase tracking-wide">Research</span>
 				<span>complete</span>
 				{result.sources.length > 0 && <span>· {result.sources.length} sources</span>}

@@ -51,7 +51,7 @@ export function ProbeDoneCard({ part }: { part: { input?: unknown; output?: unkn
 		: !strands ? "Writing the assessment…" : null;
 
 	if (note || !strands) return (
-		<div data-testid="probe-done-card" className="my-3 rounded-xl border bg-card/60 p-3">
+		<div data-testid="probe-done-card" className="lh-measure my-3 rounded-xl border bg-card/60 p-3">
 			<div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
 				{heading}
 			</div>
@@ -60,7 +60,7 @@ export function ProbeDoneCard({ part }: { part: { input?: unknown; output?: unkn
 	);
 
 	return (
-		<details data-testid="probe-done-card" className="group my-3 overflow-hidden rounded-xl border bg-card/60">
+		<details data-testid="probe-done-card" className="group lh-measure my-3 overflow-hidden rounded-xl border bg-card/60">
 			<summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl p-3 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:bg-accent/40 group-open:rounded-b-none group-open:border-b [&::-webkit-details-marker]:hidden">
 				{heading}
 				<span className="ml-auto shrink-0 font-normal normal-case tracking-normal text-muted-foreground/70">

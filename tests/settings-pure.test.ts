@@ -36,6 +36,8 @@ describe("resolveAppearance — delta over factory", () => {
 		assert.equal(a.fontFamily, null);
 		assert.equal(a.proseFontSize, 16);
 		assert.equal(a.sessionNameSerif, true);
+		assert.equal(a.textWidth, "full");
+		assert.equal(a.constrainMedia, false);
 		assert.deepEqual(a.mdRendering, { headingWeight: 900, boldColor: null, italicColor: null });
 	});
 
@@ -58,6 +60,39 @@ describe("appearanceVars — the mapping the provider applies", () => {
 		assert.equal(vars["--lh-heading-weight"], "900");
 		assert.equal(vars["--font-prose"], undefined, "no font override at factory");
 		assert.equal(vars["--font-title"], undefined, "CMU stays");
+		assert.equal(vars["--lh-text-max"], "100%", "factory measure = Full");
+		assert.equal(vars["--lh-media-max"], "100%", "media keeps the full column");
+		assert.equal(vars["--lh-media-span"], "100cqi");
+		assert.equal(vars["--lh-media-outset"], "calc(50% - 50cqi)");
+		assert.equal(vars["--lh-media-table-inset"], "0px");
+	});
+
+	it("text width Large: text centers at 80rem, broken-out tables center on the text axis", () => {
+		const vars = appearanceVars(resolveAppearance({ textWidth: "xl" }), DEFAULT_THEME);
+		assert.equal(vars["--lh-text-max"], "80rem");
+		assert.equal(vars["--lh-media-max"], "100%", "media keeps the full column");
+		assert.equal(vars["--lh-media-table-inset"], "auto");
+	});
+
+	it("text width Full: the measure is the column, tables stay left-aligned", () => {
+		const vars = appearanceVars(resolveAppearance({ textWidth: "full" }), DEFAULT_THEME);
+		assert.equal(vars["--lh-text-max"], "100%");
+		assert.equal(vars["--lh-media-max"], "100%");
+		assert.equal(vars["--lh-media-table-inset"], "0px");
+	});
+
+	it("each measure maps to its Tailwind screen width", () => {
+		assert.equal(appearanceVars(resolveAppearance({ textWidth: "lg" }), DEFAULT_THEME)["--lh-text-max"], "64rem");
+		assert.equal(appearanceVars(resolveAppearance({ textWidth: "md" }), DEFAULT_THEME)["--lh-text-max"], "48rem");
+	});
+
+	it("limit media width: media follows the text measure, no breakout", () => {
+		const vars = appearanceVars(resolveAppearance({ textWidth: "lg", constrainMedia: true }), DEFAULT_THEME);
+		assert.equal(vars["--lh-text-max"], "64rem");
+		assert.equal(vars["--lh-media-max"], "64rem");
+		assert.equal(vars["--lh-media-span"], "100%");
+		assert.equal(vars["--lh-media-outset"], "0px");
+		assert.equal(vars["--lh-media-table-inset"], "0px");
 	});
 
 	it("JetBrains Mono renders from the bundled face when it is not installed", () => {

@@ -37,19 +37,22 @@ import {
 	TRANSCRIPT_WIDTH_MAX_REM,
 	TRANSCRIPT_WIDTH_MIN_REM,
 	TRANSCRIPT_WIDTH_STEP_REM,
+	TEXT_WIDTH_SIZES,
+	isTextWidth,
 	resolveSettings,
 	THEME_COLOR_KEYS,
 	type AppearanceSettings,
 	type GraphSettings,
 	type ThemeColorKey,
+	type TextWidth,
 } from "@/src/core";
 import { MenuShell } from "@/components/menu-shell";
 import { useInteractionLayers } from "@/components/interaction-layers";
 import { Hint } from "@/components/ui/hint";
-import { BUNDLED_READING_FONTS, useAppearance } from "./appearance.tsx";
+import { BUNDLED_READING_FONTS, resolveAppearance, useAppearance } from "./appearance.tsx";
 import { FontMenuList } from "./model-menu";
 import { ThemeCards } from "./theme-cards.tsx";
-import { CommitInput, SettingsMenuTrigger, SettingsRow, Toggle } from "./controls.tsx";
+import { CommitInput, SettingsMenuTrigger, SettingsRow, ThinSelect, Toggle } from "./controls.tsx";
 
 /** The slider position past the last width step: Full (no cap). */
 const TRANSCRIPT_FULL_POSITION = TRANSCRIPT_WIDTH_MAX_REM + TRANSCRIPT_WIDTH_STEP_REM;
@@ -106,6 +109,14 @@ function TranscriptWidthSlider({ value, onCommit }: { value: number | null; onCo
 /** The factory reading family — the DEFAULT row's identity (unset =
  *  this). Exported for tests. */
 export const DEFAULT_READING_FONT = "Source Sans 3";
+
+/** The Text width options, widest first. */
+const TEXT_WIDTH_LABELS: Record<TextWidth, string> = {
+	full: "Full",
+	xl: "Large",
+	lg: "Medium",
+	md: "Small",
+};
 
 /** The dev-browser fallback list (queryLocalFonts is absent there):
  *  the app's own knowns plus a handful of ubiquitous macOS families,
@@ -254,6 +265,7 @@ export function AppearanceSection({
 }) {
 	const { appearance: resolved, activeTheme, colors, themes, refreshThemes } = useAppearance();
 	const md = appearance?.mdRendering;
+	const textWidth = resolveAppearance(appearance).textWidth;
 
 	// The font dropdown's open state + its enumeration cache. undefined =
 	// not enumerated yet (desktop: click-bound queryLocalFonts pending);
@@ -506,6 +518,39 @@ export function AppearanceSection({
 					value={resolved.transcriptMaxWidth}
 					// Full = absence (the unset representation for numbers).
 					onCommit={(rem) => { void onSectionChange({ ...appearance, transcriptMaxWidth: rem ?? undefined }); }}
+				/>
+			</SettingsRow>
+			<SettingsRow
+				label="Text width"
+				hint={textWidth === "full" ? "Full column" : TEXT_WIDTH_SIZES[textWidth]}
+				testid="row-text-width"
+			>
+				<ThinSelect
+					value={textWidth}
+					ariaLabel="text width"
+					testid="select-text-width"
+					onChange={(v) => {
+						if (isTextWidth(v)) onSectionChange({ ...appearance, textWidth: v });
+					}}
+				>
+					{(Object.keys(TEXT_WIDTH_LABELS) as TextWidth[]).map((w) => (
+						<option key={w} value={w}>
+							{TEXT_WIDTH_LABELS[w]}
+						</option>
+					))}
+				</ThinSelect>
+			</SettingsRow>
+			<SettingsRow
+				label="Limit media width"
+				hint="Off = diagrams, figures, code, and tables use the full column"
+				testid="row-constrain-media"
+				dimmed={textWidth === "full"}
+			>
+				<Toggle
+					checked={appearance?.constrainMedia ?? false}
+					label="limit media width"
+					disabled={textWidth === "full"}
+					onChange={(on) => onSectionChange({ ...appearance, constrainMedia: on })}
 				/>
 			</SettingsRow>
 			<SettingsRow label="Adapt question layout" testid="row-adaptive-questions">

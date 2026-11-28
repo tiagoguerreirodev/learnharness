@@ -401,6 +401,23 @@ export interface MdRenderingSettings {
 	italicColor?: string | null;
 }
 
+/** The chat text measure — Tailwind screen widths (xl 80rem, lg 64rem,
+ *  md 48rem) or the full transcript column. */
+export const TEXT_WIDTHS = ["full", "xl", "lg", "md"] as const;
+export type TextWidth = (typeof TEXT_WIDTHS)[number];
+
+/** The CSS max width each measure stands for. */
+export const TEXT_WIDTH_SIZES: Record<TextWidth, string> = {
+	full: "100%",
+	xl: "80rem",
+	lg: "64rem",
+	md: "48rem",
+};
+
+export function isTextWidth(value: unknown): value is TextWidth {
+	return typeof value === "string" && (TEXT_WIDTHS as readonly string[]).includes(value);
+}
+
 /** Appearance settings — theme, color overrides, type, markdown emphasis. */
 export interface AppearanceSettings {
 	/** The active theme id (core/themes.ts presets or a custom file under
@@ -434,6 +451,12 @@ export interface AppearanceSettings {
 	/** Native questions adapt the bottom region's width/layout while
 	 *  expanded (wide content; question/answers side by side). Default true. */
 	adaptiveQuestions?: boolean;
+	/** Chat text measure, centered in the transcript column (default full —
+	 *  no narrowing; xl/lg/md give widescreen a reading measure). */
+	textWidth?: TextWidth;
+	/** Diagrams, figures, code, and tables follow the text measure too
+	 *  (default false — they keep the full column). */
+	constrainMedia?: boolean;
 	mdRendering?: MdRenderingSettings;
 }
 
@@ -561,6 +584,8 @@ export interface FactorySettings {
 		/** null = Full (no transcript cap). */
 		transcriptMaxWidth: number | null;
 		adaptiveQuestions: boolean;
+		textWidth: TextWidth;
+		constrainMedia: boolean;
 		mdRendering: {
 			headingWeight: number;
 			boldColor: string | null;
@@ -587,6 +612,8 @@ export const FACTORY_SETTINGS: FactorySettings = {
 		compactSessionList: false,
 		transcriptMaxWidth: null, // Full
 		adaptiveQuestions: true,
+		textWidth: "full",
+		constrainMedia: false,
 		mdRendering: { headingWeight: 900, boldColor: null, italicColor: null },
 	},
 	graph: { enabled: true, rendering: true, extractionChunkTokens: 4096 },
@@ -849,6 +876,9 @@ function sanitizeAppearance(raw: Record<string, unknown>): AppearanceSettings {
 	if (isTranscriptMaxWidth(raw.transcriptMaxWidth)) out.transcriptMaxWidth = raw.transcriptMaxWidth;
 	const adaptiveQuestions = boolOrDrop(raw.adaptiveQuestions);
 	if (adaptiveQuestions !== undefined) out.adaptiveQuestions = adaptiveQuestions;
+	if (isTextWidth(raw.textWidth)) out.textWidth = raw.textWidth;
+	const constrainMedia = boolOrDrop(raw.constrainMedia);
+	if (constrainMedia !== undefined) out.constrainMedia = constrainMedia;
 	if (raw.mdRendering !== undefined) out.mdRendering = sanitizeMdRendering(raw.mdRendering);
 	return out;
 }

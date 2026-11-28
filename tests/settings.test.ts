@@ -34,6 +34,8 @@ describe("FACTORY_SETTINGS (the compiled factory layer)", () => {
 		assert.equal(a.fontFamily, null); // Source Sans 3
 		assert.equal(a.proseFontSize, 16);
 		assert.equal(a.sessionNameSerif, true);
+		assert.equal(a.textWidth, "full"); // no narrowing until the learner opts in
+		assert.equal(a.constrainMedia, false);
 		assert.equal(a.mdRendering.headingWeight, 900);
 		assert.equal(a.mdRendering.boldColor, null); // white
 		assert.equal(a.mdRendering.italicColor, null);
@@ -89,6 +91,8 @@ describe("sanitizeUserSettings", () => {
 				fontFamily: "Some Font",
 				proseFontSize: 18,
 				sessionNameSerif: false,
+				textWidth: "md",
+				constrainMedia: true,
 				mdRendering: { headingWeight: 700, boldColor: "#ff8800", italicColor: null },
 			},
 			graph: { enabled: false },
@@ -114,7 +118,7 @@ describe("sanitizeUserSettings", () => {
 		const out = sanitizeUserSettings({
 			general: { autoUpdate: "yes" },
 			agent: { tools: { research: "no" }, prompts: { "system-prompt.md": 1 }, models: { researcher: "fast" } },
-			appearance: { theme: "Sepia!", sessionNameSerif: "true" },
+			appearance: { theme: "Sepia!", sessionNameSerif: "true", textWidth: "2xl", constrainMedia: "yes" },
 			graph: { enabled: 0 },
 		});
 		assert.ok(out);

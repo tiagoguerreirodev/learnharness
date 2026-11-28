@@ -241,6 +241,8 @@ export function resolveSettings(record: UserSettings | null): EffectiveSettings 
 			compactSessionList: appearance.compactSessionList ?? factoryAppearance.compactSessionList,
 			transcriptMaxWidth: appearance.transcriptMaxWidth ?? factoryAppearance.transcriptMaxWidth,
 			adaptiveQuestions: appearance.adaptiveQuestions ?? factoryAppearance.adaptiveQuestions,
+			textWidth: appearance.textWidth ?? factoryAppearance.textWidth,
+			constrainMedia: appearance.constrainMedia ?? factoryAppearance.constrainMedia,
 			mdRendering: {
 				headingWeight: md.headingWeight ?? factoryMd.headingWeight,
 				boldColor: md.boldColor ?? factoryMd.boldColor,

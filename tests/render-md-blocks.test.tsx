@@ -80,7 +80,7 @@ describe("md-blocks — mermaid", () => {
 describe("md-blocks — tables", () => {
 	it("sizes tables to fit the column or their minimum content, rather than always taking max-content width", () => {
 		const css = readFileSync("app/globals.css", "utf8");
-		const rule = css.match(/\[data-streamdown="table"\]\s*\{([^}]+)\}/)?.[1]?.replace(/\/\*[\s\S]*?\*\//g, "");
+		const rule = css.match(/^\[data-streamdown="table"\]\s*\{([^}]+)\}/m)?.[1]?.replace(/\/\*[\s\S]*?\*\//g, "");
 		assert.ok(rule);
 		assert.match(rule, /\bwidth:\s*fit-content\s*;/);
 		assert.doesNotMatch(rule, /\b(?:max-width|table-layout|word-break|overflow-wrap|max-height):/,
